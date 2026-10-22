@@ -1464,9 +1464,29 @@ button.dock-label:hover { color: var(--cyan); }
   }
 
   // ---------- Office bridge (Supabase Edge Function): every Zoho app goes through it ----------
+  // Zoho answers take 1.5 to 6 seconds, so read results are kept for a short while: the panels,
+  // the brief and your questions share them, and two identical requests at once make one call.
+  // Any change (a mail sent, a record updated) clears everything, so nothing stale is shown.
+  const CHANGE_ACTIONS = /^(mail_send|crm_create|crm_update|crm_add_note|expense_create|people_apply_leave|people_attendance|zoho_connect)$/;
   class Bridge {
-    constructor(url, key, http = defaultHttp) { Object.assign(this, { url: url.trim(), key: key.trim(), http }); }
+    constructor(url, key, http = defaultHttp) { Object.assign(this, { url: url.trim(), key: key.trim(), http, cache: new Map() }); }
+
+    /** A read that may be served from a copy at most [maxAgeMs] old (0 = always fetch, but keep the copy). */
+    cached(action, body = {}, maxAgeMs = 120000) {
+      const key = `${action} ${JSON.stringify(body)}`;
+      const hit = this.cache.get(key);
+      if (hit && (hit.pending || Date.now() - hit.at < maxAgeMs)) return hit.promise;
+      const entry = { at: Date.now(), pending: true };
+      entry.promise = this.call(action, body).then(
+        (v) => { entry.pending = false; entry.at = Date.now(); return v; },
+        (e) => { this.cache.delete(key); throw e; },
+      );
+      this.cache.set(key, entry);
+      return entry.promise;
+    }
+
     async call(action, body = {}) {
+      if (CHANGE_ACTIONS.test(action)) this.cache.clear();
       let res;
       try {
         res = await this.http(this.url, {
@@ -1586,6 +1606,8 @@ button.dock-label:hover { color: var(--cyan); }
   ];
 
   // Changes are never made straight away: Jo Office reads them back and waits for "yes".
+  const READ_MAX_AGE = 2 * 60000; // answers may use Zoho data up to two minutes old
+  const MAIL_FETCH = 30, AGENDA_DAYS = 7;
   const WRITE_TOOLS = new Set(["send_email", "reply_email", "crm_create_lead", "crm_add_note", "crm_create_task", "crm_create_meeting",
     "crm_update_record", "crm_complete_task", "add_expense", "apply_leave", "check_in", "check_out"]);
   // A reply confirms or cancels only when it is nothing but that: "yes, but make it Friday" and
@@ -1655,6 +1677,24 @@ button.dock-label:hover { color: var(--cyan); }
 
     zoho() { if (!this.bridge) throw new Error("Zoho is not connected yet. Fill in the office bridge in Settings."); return this.bridge; }
 
+    /** A Zoho read, served from a copy up to [maxAgeMs] old when the bridge keeps one. */
+    read(action, body = {}, maxAgeMs = READ_MAX_AGE) {
+      const z = this.zoho();
+      return z.cached ? z.cached(action, body, maxAgeMs) : z.call(action, body);
+    }
+
+    /** Loads what questions and the brief usually need, so they answer without waiting for Zoho. */
+    async prefetch() {
+      if (!this.bridge) return;
+      const age = 60000; // refresh only what is over a minute old (the panels load some of it already)
+      await Promise.all([
+        this.read("mail_unread", { limit: MAIL_FETCH }, age), this.read("crm_my_tasks", {}, age), this.read("crm_agenda", this.agendaRange(), age),
+        this.read("crm_pipeline", {}, age), this.read("expense_reports", {}, age), this.read("people_holidays", this.holidayRange(14), 3600000),
+      ].map((p) => p.catch(() => {})));
+    }
+    agendaRange(days = AGENDA_DAYS) { const from = startOfToday(); return { from, to: from + days * 86400000 }; }
+    holidayRange(days) { return { from: isoDate(), to: isoDate(new Date(Date.now() + days * 86400000)) }; }
+
     async call(name, args = {}) {
       try {
         if (WRITE_TOOLS.has(name)) return this.propose(name, args);
@@ -1687,17 +1727,17 @@ button.dock-label:hover { color: var(--cyan); }
           case "crm_my_tasks": return await this.listTasks();
           case "crm_meetings": return await this.listEvents(Math.min(Math.max(args.days || 1, 1), 31));
           case "crm_pipeline": {
-            const { deals } = await z().call("crm_pipeline");
+            const { deals } = await this.read("crm_pipeline");
             return deals.length ? json(deals, 8000) : "No open deals.";
           }
-          case "expense_list": return json((await z().call("expense_list", { limit: args.limit || 20 })).expenses);
-          case "expense_reports": return json((await z().call("expense_reports")).reports);
-          case "expense_categories": return (await z().call("expense_categories")).categories.map((c) => c.name).join(", ");
-          case "people_profile": return json((await z().call("people_profile")).profile);
-          case "leave_balance": return json((await z().call("people_leave_balance")).leaveTypes);
+          case "expense_list": return json((await this.read("expense_list", { limit: args.limit || 20 })).expenses);
+          case "expense_reports": return json((await this.read("expense_reports")).reports);
+          case "expense_categories": return (await this.read("expense_categories", {}, 3600000)).categories.map((c) => c.name).join(", ");
+          case "people_profile": return json((await this.read("people_profile", {}, 3600000)).profile);
+          case "leave_balance": return json((await this.read("people_leave_balance")).leaveTypes);
           case "holidays": {
-            const from = isoDate(), to = isoDate(new Date(Date.now() + (args.days || 30) * 86400000));
-            const { holidays } = await z().call("people_holidays", { from, to });
+            const days = Number(args.days) || 30;
+            const { holidays } = await this.read("people_holidays", this.holidayRange(days), 3600000);
             return holidays.length ? json(holidays) : "No holidays in that period.";
           }
           default: return `Unknown function ${name}`;
@@ -1803,27 +1843,33 @@ button.dock-label:hover { color: var(--cyan); }
 
     async briefData() {
       const safe = async (f) => { try { return await f(); } catch (e) { return `Unavailable: ${e.message}`; } };
-      const z = () => this.zoho();
-      return [
-        "## Today's meetings (Zoho CRM)", await safe(() => this.listEvents(1)),
-        "\n## Open CRM tasks", await safe(() => this.listTasks()),
-        "\n## Open deals (Zoho CRM)", await safe(async () => json((await z().call("crm_pipeline")).deals, 4000)),
-        "\n## Unread mail (Zoho Mail)", await safe(() => this.unreadMail(12)),
-        "\n## Expense reports (Zoho Expense)", await safe(async () => json((await z().call("expense_reports")).reports, 2500)),
-        "\n## Holidays in the next 14 days (Zoho People)", await safe(async () => json((await z().call("people_holidays", {
-          from: isoDate(), to: isoDate(new Date(Date.now() + 14 * 86400000)),
-        })).holidays, 1500)),
-      ].join("\n");
+      // All six at once (one after another took about 15 seconds); usually already loaded by prefetch().
+      const parts = await Promise.all([
+        safe(() => this.listEvents(1)),
+        safe(() => this.listTasks()),
+        safe(async () => json((await this.read("crm_pipeline")).deals, 4000)),
+        safe(() => this.unreadMail(12)),
+        safe(async () => json((await this.read("expense_reports")).reports, 2500)),
+        safe(async () => json((await this.read("people_holidays", this.holidayRange(14), 3600000)).holidays, 1500)),
+      ]);
+      const titles = ["## Today's meetings (Zoho CRM)", "## Open CRM tasks", "## Open deals (Zoho CRM)", "## Unread mail (Zoho Mail)",
+        "## Expense reports (Zoho Expense)", "## Holidays in the next 14 days (Zoho People)"];
+      return titles.map((t, i) => `${i ? "\n" : ""}${t}\n${parts[i]}`).join("\n");
+    }
+
+    /** Unread mail, newest first; always fetched as one list of 30 so every caller shares it. */
+    async mail(maxAgeMs = READ_MAX_AGE) {
+      return (await this.read("mail_unread", { limit: MAIL_FETCH }, maxAgeMs)).mails || [];
     }
 
     async unreadMail(limit) {
-      const { mails } = await this.zoho().call("mail_unread", { limit });
+      const mails = (await this.mail()).slice(0, limit);
       return mails.length ? mails.map(describeMail).join("\n") : "No unread mail.";
     }
 
     /** Open CRM tasks as { id, title, due (ms or null), date, priority }. */
-    async tasks() {
-      const { tasks = [] } = await this.zoho().call("crm_my_tasks");
+    async tasks(maxAgeMs = READ_MAX_AGE) {
+      const { tasks = [] } = await this.read("crm_my_tasks", {}, maxAgeMs);
       return tasks.map((t) => ({
         id: String(t.id), title: t.Subject || "(no subject)", date: t.Due_Date || null,
         due: t.Due_Date ? parseLocal(t.Due_Date) : null, priority: t.Priority || "", status: t.Status || "",
@@ -1837,14 +1883,15 @@ button.dock-label:hover { color: var(--cyan); }
         : "No open CRM tasks.";
     }
 
-    /** CRM meetings from the start of today for [days] days. */
-    async events(days) {
-      const from = startOfToday(), to = from + days * 86400000;
-      const { events = [] } = await this.zoho().call("crm_agenda", { from, to });
+    /** CRM meetings from the start of today for [days] days (a week is fetched once and shared). */
+    async events(days, maxAgeMs = READ_MAX_AGE) {
+      const range = this.agendaRange(Math.max(days, AGENDA_DAYS));
+      const until = range.from + days * 86400000;
+      const { events = [] } = await this.read("crm_agenda", range, maxAgeMs);
       return events.map((e) => {
         const start = Date.parse(e.Start_DateTime), end = Date.parse(e.End_DateTime || e.Start_DateTime);
         return { id: String(e.id), title: e.Event_Title || "(no title)", start, end, allDay: !!e.All_day, location: e.Venue || "" };
-      }).sort((a, b) => a.start - b.start);
+      }).filter((e) => e.start < until).sort((a, b) => a.start - b.start);
     }
 
     async listEvents(days) {
@@ -1976,7 +2023,7 @@ button.dock-label:hover { color: var(--cyan); }
         "If a source is not connected or unavailable, mention it in a few words. Plain sentences for text-to-speech: no lists, symbols or markdown.",
         "", data,
       ].join("\n");
-      const reply = await this.gemini.generate(this.systemPrompt(), [Gemini.userText(prompt)]);
+      const reply = await this.gemini.generate(this.systemPrompt(), [Gemini.userText(prompt)], [], null, { fast: true }); // the quick model first
       const text = Gemini.text(reply);
       if (!text) throw new Error("Gemini returned an empty brief.");
       return text;
@@ -2072,8 +2119,17 @@ button.dock-label:hover { color: var(--cyan); }
   // ---------- Jo's brain ----------
   let agent = null;
   function buildTools() {
-    const bridge = settings.bridgeUrl && settings.bridgeKey ? new Bridge(settings.bridgeUrl, settings.bridgeKey) : null;
-    return new Tools({ bridge, memory: learned });
+    return new Tools({ bridge: sharedBridge(), memory: learned });
+  }
+  // One bridge for the whole page, so the panels, the brief and your questions share what was
+  // just fetched from Zoho (a new one only when the bridge settings change).
+  let bridgeConn = null;
+  function sharedBridge() {
+    if (!settings.bridgeUrl || !settings.bridgeKey) return (bridgeConn = null);
+    if (!bridgeConn || bridgeConn.url !== settings.bridgeUrl.trim() || bridgeConn.key !== settings.bridgeKey.trim()) {
+      bridgeConn = new Bridge(settings.bridgeUrl, settings.bridgeKey);
+    }
+    return bridgeConn;
   }
   function getAgent() {
     if (!settings.geminiKey) return null;
@@ -2184,6 +2240,39 @@ button.dock-label:hover { color: var(--cyan); }
   }
   // Browsers only allow sound after a click or key press; prepare audio on the first one.
   ["pointerdown", "keydown"].forEach((ev) => addEventListener(ev, ensureAudio, { once: true }));
+  /** True when sound can actually play now (the browser may still be holding it until a click). */
+  async function audioReady() {
+    const ac = ensureAudio();
+    if (!ac) return false;
+    if (ac.state !== "running") await Promise.race([ac.resume().catch(() => {}), new Promise((r) => setTimeout(r, 600))]);
+    return ac.state === "running";
+  }
+
+  /**
+   * Plays one piece of Gemini voice (base64 16-bit mono PCM at [rate] Hz) right after the previous
+   * one. Jo goes back to standby when the last piece has finished.
+   */
+  function playPcm({ data, rate }, seq) {
+    const ac = ensureAudio();
+    const bin = atob(data), count = bin.length >> 1;
+    if (!count) return;
+    const buf = ac.createBuffer(1, count, rate || 24000), ch = buf.getChannelData(0);
+    for (let i = 0; i < count; i++) {
+      const v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8);
+      ch[i] = (v >= 0x8000 ? v - 0x10000 : v) / 0x8000;
+    }
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(analyser || ac.destination);
+    const at = Math.max(ac.currentTime + 0.05, nextAt);
+    src.start(at);
+    nextAt = at + buf.duration;
+    sources.add(src);
+    src.onended = () => {
+      sources.delete(src);
+      if (seq === speakSeq && !streaming && !sources.size) setState("idle");
+    };
+  }
 
   function stopSpeaking() {
     speakSeq++;
@@ -2277,29 +2366,38 @@ button.dock-label:hover { color: var(--cyan); }
       const voice = opts.voice || (lang === "ta" ? settings.geminiVoiceTa : settings.geminiVoiceEn) || "Charon";
       try {
         setState("thinking", "PREPARING VOICE");
+        // Sound held back by the browser (no click on the page yet): the PC voice is the safer choice.
+        if (!(await audioReady())) throw new Error("The browser is holding back sound until you click the page.");
+        if (seq !== speakSeq) return;
         const style = lang === "ta" ? "" : "Say in a calm, clear, friendly voice with a light Indian English accent:";
         // Stream: Jo starts talking as soon as the first piece of audio arrives.
         streaming = true; nextAt = 0;
-        let started = false;
+        let played = 0;
+        // No audio after 12 seconds: give up on the Gemini voice for this reply.
+        const slow = new Promise((_, reject) => setTimeout(() => { if (!played) reject(new Error("The Gemini voice is taking too long.")); }, 12000));
         try {
-          await new Gemini(settings.geminiKey, settings.geminiModel).speech(text, voice, settings.ttsModel || DEFAULT_TTS_MODEL, style, (piece) => {
+          await Promise.race([slow, new Gemini(settings.geminiKey, settings.geminiModel).speech(text, voice, settings.ttsModel || DEFAULT_TTS_MODEL, style, (piece) => {
             if (seq !== speakSeq) return; // something newer started meanwhile
-            if (!started) { started = true; setState("speaking"); }
             playPcm(piece, seq);
-          });
+            if (!played++) setState("speaking");
+          })]);
         } catch (e) {
-          if (started) e.partial = true; // some audio already played: don't repeat it in the PC voice
+          if (played) e.partial = true; // some audio really played: don't repeat it in the PC voice
           throw e;
         } finally {
           if (seq === speakSeq) streaming = false;
         }
         if (seq === speakSeq && !sources.size) setState("idle");
-        return;
+        if (played) return;
+        throw new Error("The Gemini voice sent no audio.");
       } catch (e) {
         if (seq !== speakSeq) return;
         if (e.partial) { if (!sources.size) setState("idle"); return; }
+        stopSpeaking(); // drop anything half-started before the PC voice takes over
         if (!warnedGeminiVoice || opts.voice) toast(`${e.message} Using the ${DEVICE} voice instead.`);
         warnedGeminiVoice = true;
+        if (fast || opts.fromPc) { setState("idle"); return; } // the PC voice already failed for this reply
+        return speakWithPc(text, lang, lang === "ta" ? settings.pcVoiceTa : settings.pcVoiceEn, speakSeq, null);
       }
     }
     const pcName = opts.engine === "browser" && opts.voice ? opts.voice : lang === "ta" ? settings.pcVoiceTa : settings.pcVoiceEn;
@@ -2307,7 +2405,7 @@ button.dock-label:hover { color: var(--cyan); }
     const fallback = fast && settings.geminiKey ? (e) => {
       if (seq !== speakSeq) return;
       if (!warnedPcVoice) { toast(`${e.message} Using the Gemini voice.`); warnedPcVoice = true; }
-      speak(text, { ...opts, engine: "gemini" });
+      speak(text, { ...opts, engine: "gemini", fromPc: true });
     } : null;
     speakWithPc(text, lang, pcName, seq, fallback);
   }
@@ -2657,16 +2755,16 @@ button.dock-label:hover { color: var(--cyan); }
     $("sys-summary").classList.toggle("warn", faults > 0 || ok < rows.length);
   }
 
-  // Open Zoho CRM tasks (the user's own).
+  // Open Zoho CRM tasks (the user's own). The ↻ button (fresh) always asks Zoho; otherwise data up to two minutes old is fine.
   let tasksBusy = false;
-  async function renderTasks() {
+  async function renderTasks(fresh = false) {
     const tools = buildTools();
     if (!tools.bridge) { $("tasks").innerHTML = '<li class="muted">Zoho CRM not connected.</li>'; $("hud-tasks").textContent = "—"; return; }
     if (tasksBusy) return;
     tasksBusy = true;
     let list;
     try {
-      list = (await tools.tasks()).slice(0, 40);
+      list = (await tools.tasks(fresh ? 0 : undefined)).slice(0, 40);
       setHealth("crm", "ok");
     } catch (e) {
       setHealth("crm", "err");
@@ -2685,13 +2783,13 @@ button.dock-label:hover { color: var(--cyan); }
 
   // Zoho CRM meetings, today and tomorrow.
   let agendaBusy = false;
-  async function renderAgenda() {
+  async function renderAgenda(fresh = false) {
     const tools = buildTools();
     if (!tools.bridge) { $("agenda").innerHTML = '<li class="muted">Zoho CRM not connected.</li>'; return; }
     if (agendaBusy) return;
     agendaBusy = true;
     try {
-      const list = await tools.events(2);
+      const list = await tools.events(2, fresh ? 0 : undefined);
       const tomorrow = startOfToday() + 86400000;
       const item = (e) => {
         const when = e.allDay ? "ALL DAY" : new Date(e.start).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }).toUpperCase();
@@ -2742,7 +2840,7 @@ button.dock-label:hover { color: var(--cyan); }
     if (mailBusy) return;
     mailBusy = true;
     try {
-      const { mails } = await bridge.call("mail_unread", { limit: 30 });
+      const mails = await buildTools().mail(0); // always fresh for the panel; questions reuse it
       setHealth("mail", "ok");
       const stored = readJson("office.mailSeen", null);
       const seen = new Set(stored || []);
@@ -2928,8 +3026,8 @@ button.dock-label:hover { color: var(--cyan); }
     const b = e.target.closest("button[data-heard]"); if (!b) return;
     learned.remove(b.dataset.heard); renderLearned();
   });
-  $("refresh-agenda").addEventListener("click", renderAgenda);
-  $("refresh-tasks").addEventListener("click", renderTasks);
+  $("refresh-agenda").addEventListener("click", () => renderAgenda(true));
+  $("refresh-tasks").addEventListener("click", () => renderTasks(true));
   // Systems in the dock: collapsed to dots by default; the choice is remembered on this device.
   const setSystemsOpen = (open) => {
     $("dock-systems").classList.toggle("collapsed", !open);
@@ -2999,8 +3097,12 @@ button.dock-label:hover { color: var(--cyan); }
   renderAgenda();
   setInterval(tickClock, 1000 * 15);
   setInterval(checkBrief, 60000);
-  setInterval(renderAgenda, 10 * 60000);
-  setInterval(renderTasks, 5 * 60000); // picks up tasks added in Zoho CRM elsewhere
+  setInterval(() => renderAgenda(true), 10 * 60000);
+  setInterval(() => renderTasks(true), 5 * 60000); // picks up tasks added in Zoho CRM elsewhere
+  // Keep what the brief and common questions need loaded, so answers don't wait for Zoho.
+  const prefetch = () => { if (document.visibilityState === "visible" && !busy) buildTools().prefetch(); };
+  setTimeout(prefetch, 3000);
+  setInterval(prefetch, 4 * 60000);
   checkBrief();
   checkMail(); scheduleMail();
 })();
