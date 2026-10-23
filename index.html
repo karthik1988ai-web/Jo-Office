@@ -659,6 +659,7 @@ button.dock-label:hover { color: var(--cyan); }
       </div>
       <label>Check for new mail every (minutes, 0 = off)<input type="number" min="0" max="60" data-setting="mailCheckMinutes"></label>
       <label class="row"><input type="checkbox" data-setting="announceMail"> Announce new emails aloud</label>
+      <label class="row"><input type="checkbox" data-setting="markRead"> Mark emails as read in Zoho Mail when Jo Office reads them to you</label>
       <p class="hint">Jo Office reads freely, but never sends mail or changes anything in Zoho until you say "yes" (or click Yes).</p>
     </section>
 
@@ -1487,6 +1488,8 @@ button.dock-label:hover { color: var(--cyan); }
 
     async call(action, body = {}) {
       if (CHANGE_ACTIONS.test(action)) this.cache.clear();
+      // Reading an email marks it read in Zoho, so the unread list must be fetched again.
+      if (action === "mail_read" && body.markRead !== false) for (const k of this.cache.keys()) if (k.startsWith("mail_unread ")) this.cache.delete(k);
       let res;
       try {
         res = await this.http(this.url, {
@@ -1554,6 +1557,12 @@ button.dock-label:hover { color: var(--cyan); }
       subject: ["string", "Re: original subject"], body: ["string", "Plain-text reply"],
     }, ["message_id", "to", "body"]),
 
+    fn("save_draft", "Write an email (new, or a reply when message_id is given) and save it in Zoho Mail's Drafts folder without sending, for the user to check and send later. Use when they say draft, prepare, or don't send yet. Needs the user's confirmation.", {
+      to: ["string", "Recipient email address(es), comma separated"], cc: ["string", "Optional CC addresses"],
+      subject: ["string", "Subject line (Re: original subject for a reply)"], body: ["string", "Plain-text email body, polite and complete, signed with the user's name"],
+      message_id: ["string", "Optional: messageId of the email being answered, to save a reply draft"],
+    }, ["to", "body"]),
+
     // Zoho CRM
     fn("crm_search", "Find Zoho CRM records by a word (name, company, email, phone).",
       { module: MODULE, word: ["string", "Search word"], limit: ["integer", "Default 10"] }, ["module", "word"]),
@@ -1570,8 +1579,12 @@ button.dock-label:hover { color: var(--cyan); }
     fn("crm_add_note", "Add a note to a CRM record. Needs the user's confirmation.", {
       module: MODULE, record_id: ["string", "id from a search"], title: ["string", "Short title"], content: ["string", "The note"],
     }, ["module", "record_id", "content"]),
-    fn("crm_create_task", "Create a Zoho CRM task (a follow-up or to-do), optionally linked to a record. Needs the user's confirmation.", {
+    fn("team_members", "The user's team: Zoho CRM users with their names and email addresses."),
+    fn("team_tasks", "Follow up on the team: open CRM tasks the user gave to others, or one team member's open tasks, with due dates and which are overdue.",
+      { person: ["string", "Optional: a team member's name, to see only their tasks"] }),
+    fn("crm_create_task", "Create a Zoho CRM task (a follow-up or to-do) for the user or for a team member (assign_to), optionally linked to a record. Needs the user's confirmation.", {
       subject: ["string", "What to do"], due_date: ["string", "YYYY-MM-DD"], description: ["string", "Details"],
+      assign_to: ["string", "Optional: the team member's name who should do it; omit for the user's own task"],
       module: ["string", "Optional: Leads, Contacts, Accounts or Deals the task is about"], record_id: ["string", "Optional: that record's id"],
     }, ["subject"]),
     fn("crm_create_meeting", "Add a meeting to Zoho CRM (Events). Needs the user's confirmation.", {
@@ -1608,7 +1621,7 @@ button.dock-label:hover { color: var(--cyan); }
   // Changes are never made straight away: Jo Office reads them back and waits for "yes".
   const READ_MAX_AGE = 2 * 60000; // answers may use Zoho data up to two minutes old
   const MAIL_FETCH = 30, AGENDA_DAYS = 7;
-  const WRITE_TOOLS = new Set(["send_email", "reply_email", "crm_create_lead", "crm_add_note", "crm_create_task", "crm_create_meeting",
+  const WRITE_TOOLS = new Set(["send_email", "reply_email", "save_draft", "crm_create_lead", "crm_add_note", "crm_create_task", "crm_create_meeting",
     "crm_update_record", "crm_complete_task", "add_expense", "apply_leave", "check_in", "check_out"]);
   // A reply confirms or cancels only when it is nothing but that: "yes, but make it Friday" and
   // "no, the name is Ravi Kumar" are corrections, which go back to Gemini to propose again.
@@ -1633,8 +1646,8 @@ button.dock-label:hover { color: var(--cyan); }
   const money = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 
   class Tools {
-    constructor({ bridge = null, search = null, memory = null }) {
-      Object.assign(this, { bridge, search, memory });
+    constructor({ bridge = null, search = null, memory = null, markRead = true }) {
+      Object.assign(this, { bridge, search, memory, markRead }); // markRead: emails read out are marked read in Zoho Mail
       this.pending = null; // { name, args, summary } waiting for the user's yes
     }
     get functions() { return FUNCTIONS; }
@@ -1689,7 +1702,7 @@ button.dock-label:hover { color: var(--cyan); }
       const age = 60000; // refresh only what is over a minute old (the panels load some of it already)
       await Promise.all([
         this.read("mail_unread", { limit: MAIL_FETCH }, age), this.read("crm_my_tasks", {}, age), this.read("crm_agenda", this.agendaRange(), age),
-        this.read("crm_pipeline", {}, age), this.read("expense_reports", {}, age), this.read("people_holidays", this.holidayRange(14), 3600000),
+        this.read("crm_pipeline", {}, age), this.read("expense_reports", {}, age), this.read("crm_team_tasks", {}, age), this.read("people_holidays", this.holidayRange(14), 3600000),
       ].map((p) => p.catch(() => {})));
     }
     agendaRange(days = AGENDA_DAYS) { const from = startOfToday(); return { from, to: from + days * 86400000 }; }
@@ -1697,7 +1710,7 @@ button.dock-label:hover { color: var(--cyan); }
 
     async call(name, args = {}) {
       try {
-        if (WRITE_TOOLS.has(name)) return this.propose(name, args);
+        if (WRITE_TOOLS.has(name)) return await this.propose(name, args);
         const z = () => this.zoho();
         switch (name) {
           case "web_search": return await this.webSearch(String(args.query || ""));
@@ -1712,7 +1725,7 @@ button.dock-label:hover { color: var(--cyan); }
             return mails.length ? mails.map(describeMail).join("\n") : "No matching emails.";
           }
           case "read_mail": {
-            const { content } = await z().call("mail_read", { folderId: args.folder_id, messageId: args.message_id });
+            const { content } = await z().call("mail_read", { folderId: args.folder_id, messageId: args.message_id, markRead: this.markRead });
             return clip(stripHtml(content), 5000);
           }
           case "crm_search": {
@@ -1725,6 +1738,11 @@ button.dock-label:hover { color: var(--cyan); }
             return records.length ? json(records, 10000) : "No records match.";
           }
           case "crm_my_tasks": return await this.listTasks();
+          case "team_members": {
+            const team = await this.team();
+            return team.length ? team.map((u) => `- ${u.name}${u.role ? ` (${u.role})` : ""}, ${u.email}`).join("\n") : "No other CRM users found.";
+          }
+          case "team_tasks": return await this.listTeamTasks(args.person);
           case "crm_meetings": return await this.listEvents(Math.min(Math.max(args.days || 1, 1), 31));
           case "crm_pipeline": {
             const { deals } = await this.read("crm_pipeline");
@@ -1748,9 +1766,11 @@ button.dock-label:hover { color: var(--cyan); }
     }
 
     /** Checks a change and keeps it until the user says yes. Returns what Gemini should read back. */
-    propose(name, args) {
+    async propose(name, args) {
       if (this.pending && this.pending.fresh) return "Only one change at a time. Ask the user to confirm the first one.";
       this.zoho();
+      // A task for someone else: find who, before anything is read back.
+      if (name === "crm_create_task" && args.assign_to) args = { ...args, owner: await this.teamMember(args.assign_to) };
       const summary = this.summarize(name, args);
       this.pending = { name, args, summary, fresh: true };
       return `NOT DONE YET. Read this back in one or two short sentences and ask the user to say yes to confirm or no to cancel: ${summary}`;
@@ -1760,9 +1780,10 @@ button.dock-label:hover { color: var(--cyan); }
       switch (name) {
         case "send_email": return `Send an email to ${a.to}${a.cc ? `, cc ${a.cc}` : ""}, subject "${a.subject}": ${a.body}`;
         case "reply_email": return `Reply to ${a.to}: ${a.body}`;
+        case "save_draft": return `Save a draft ${a.message_id ? "reply" : "email"} (not sent) to ${a.to}${a.cc ? `, cc ${a.cc}` : ""}${a.subject ? `, subject "${a.subject}"` : ""}: ${a.body}`;
         case "crm_create_lead": return `Create a CRM lead: ${[a.first_name, a.last_name].filter(Boolean).join(" ")}${a.company ? ` from ${a.company}` : ""}${a.phone ? `, phone ${a.phone}` : ""}${a.email ? `, email ${a.email}` : ""}.`;
         case "crm_add_note": return `Add a note to the ${a.module} record: "${a.content}".`;
-        case "crm_create_task": return `Create a CRM task "${a.subject}"${a.due_date ? ` due ${dateOnly(a.due_date)}` : ""}.`;
+        case "crm_create_task": return `Create a CRM task "${a.subject}"${a.owner ? ` for ${a.owner.name}` : " for you"}${a.due_date ? `, due ${dateOnly(a.due_date)}` : ""}.`;
         case "crm_create_meeting": {
           const start = parseLocal(a.start);
           return `Add the meeting "${a.title}" on ${formatTime(start)}${a.venue ? ` at ${a.venue}` : ""} to Zoho CRM.`;
@@ -1791,6 +1812,9 @@ button.dock-label:hover { color: var(--cyan); }
         case "send_email":
           await z.call("mail_send", { to: a.to, cc: a.cc || "", subject: a.subject, content: a.body });
           return `Sent to ${a.to}.`;
+        case "save_draft":
+          await z.call("mail_send", { to: a.to, cc: a.cc || "", subject: a.subject || "", content: a.body, draft: true, ...(a.message_id ? { replyTo: a.message_id } : {}) });
+          return "Saved in your Zoho Mail Drafts. It has not been sent.";
         case "reply_email":
           await z.call("mail_send", { to: a.to, subject: a.subject || "Re:", content: a.body, replyTo: a.message_id });
           return `Reply sent to ${a.to}.`;
@@ -1808,8 +1832,9 @@ button.dock-label:hover { color: var(--cyan); }
           const mod = String(a.module || "").toLowerCase();
           if (a.record_id && /^(leads?|contacts?)$/.test(mod)) fields.Who_Id = { id: a.record_id };
           else if (a.record_id && /^(accounts?|deals?)$/.test(mod)) { fields.What_Id = { id: a.record_id }; fields.$se_module = /^deal/.test(mod) ? "Deals" : "Accounts"; }
+          if (a.owner) fields.Owner = { id: a.owner.id };
           await z.call("crm_create", { module: "Tasks", fields });
-          return `Task "${a.subject}" created in Zoho CRM.`;
+          return a.owner ? `Task "${a.subject}" given to ${a.owner.name} in Zoho CRM.` : `Task "${a.subject}" created in Zoho CRM.`;
         }
         case "crm_create_meeting": {
           const start = parseLocal(a.start);
@@ -1847,12 +1872,13 @@ button.dock-label:hover { color: var(--cyan); }
       const parts = await Promise.all([
         safe(() => this.listEvents(1)),
         safe(() => this.listTasks()),
+        safe(() => this.listTeamTasks()),
         safe(async () => json((await this.read("crm_pipeline")).deals, 4000)),
         safe(() => this.unreadMail(12)),
         safe(async () => json((await this.read("expense_reports")).reports, 2500)),
         safe(async () => json((await this.read("people_holidays", this.holidayRange(14), 3600000)).holidays, 1500)),
       ]);
-      const titles = ["## Today's meetings (Zoho CRM)", "## Open CRM tasks", "## Open deals (Zoho CRM)", "## Unread mail (Zoho Mail)",
+      const titles = ["## Today's meetings (Zoho CRM)", "## Open CRM tasks", "## Tasks given to the team (open)", "## Open deals (Zoho CRM)", "## Unread mail (Zoho Mail)",
         "## Expense reports (Zoho Expense)", "## Holidays in the next 14 days (Zoho People)"];
       return titles.map((t, i) => `${i ? "\n" : ""}${t}\n${parts[i]}`).join("\n");
     }
@@ -1874,6 +1900,48 @@ button.dock-label:hover { color: var(--cyan); }
         id: String(t.id), title: t.Subject || "(no subject)", date: t.Due_Date || null,
         due: t.Due_Date ? parseLocal(t.Due_Date) : null, priority: t.Priority || "", status: t.Status || "",
       }));
+    }
+
+    /** Everyone in the company's Zoho CRM, as { id, name, email, role }. */
+    async team() { return (await this.read("crm_users", {}, 600000)).users || []; }
+
+    /** The team member a spoken name means. Unclear or unknown names come back as a question. */
+    async teamMember(name) {
+      const team = await this.team();
+      const norm = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+      const n = norm(name), words = n.split(" ");
+      const score = (u) => {
+        const full = norm(u.name);
+        if (full === n) return 3;
+        if (full.split(" ")[0] === n || full.startsWith(`${n} `)) return 2;
+        if (words.every((w) => full.includes(w)) || u.email.toLowerCase().startsWith(n.replace(/\s/g, ""))) return 1;
+        return 0;
+      };
+      const ranked = team.map((u) => ({ u, s: score(u) })).filter((x) => x.s).sort((a, b) => b.s - a.s);
+      if (!ranked.length) throw new Error(`No team member called "${name}" in Zoho CRM. The team is: ${team.map((u) => u.name).join(", ") || "nobody else"}. Ask who they meant.`);
+      const best = ranked.filter((x) => x.s === ranked[0].s);
+      if (best.length > 1) throw new Error(`More than one team member matches "${name}": ${best.map((x) => x.u.name).join(", ")}. Ask which one.`);
+      const { id, name: full, email } = best[0].u;
+      return { id, name: full, email };
+    }
+
+    /** Open tasks given to others (or one person's), as { id, title, owner, date, due, overdue, priority }. */
+    async teamTasks(person) {
+      const body = person ? { ownerId: (await this.teamMember(person)).id } : {};
+      const { tasks = [] } = await this.read("crm_team_tasks", body);
+      const today = startOfToday();
+      return tasks.map((t) => {
+        const due = t.Due_Date ? parseLocal(t.Due_Date) : null;
+        return { id: String(t.id), title: t.Subject || "(no subject)", owner: t.Owner_Name || "", date: t.Due_Date || null, due, overdue: !!due && due < today, priority: t.Priority || "" };
+      });
+    }
+
+    async listTeamTasks(person) {
+      const list = await this.teamTasks(person);
+      if (!list.length) return person ? `${person} has no open CRM tasks.` : "No open tasks given to the team.";
+      const overdue = list.filter((t) => t.overdue).length;
+      return `${list.length} open, ${overdue} overdue.\n` + list.map((t) =>
+        `- ${t.owner ? `${t.owner}: ` : ""}${t.title}${t.date ? ` (due ${t.date})` : ""}${t.overdue ? " OVERDUE" : ""}${t.priority ? `, ${t.priority}` : ""}  id=${t.id}`).join("\n");
     }
 
     async listTasks() {
@@ -1930,6 +1998,10 @@ button.dock-label:hover { color: var(--cyan); }
         "Changes (sending mail, creating or updating CRM records, expenses, leave, attendance) are never done straight away:",
         "the function answers NOT DONE YET, and you then read the change back briefly and ask the user to say yes or no.",
         "Never say a change is done until the user has confirmed it. Before writing an email, make sure you know the recipient's address.",
+        "The user leads a team. To give someone a task, use crm_create_task with assign_to (their name); to follow up, use",
+        "team_tasks (everyone, or one person); to chase someone, send_email to their address from team_members.",
+        "To write an email the user wants to check first, or when they say \"save it as a draft\" instead of yes, use save_draft",
+        "(with message_id for a reply). It goes to Zoho Mail Drafts and is not sent.",
         "For anything current or outside the user's Zoho data, use web_search and name the main source in a few words.",
         "",
         "The user speaks, and speech recognition makes mistakes, especially with names and Indian pronunciation. Read their words",
@@ -2018,7 +2090,7 @@ button.dock-label:hover { color: var(--cyan); }
       const prompt = [
         `[Now: ${this.now()}]`,
         `Write ${this.userName}'s spoken morning work brief from the data below. Order: a one-line greeting, today's meetings,`,
-        "tasks due today or overdue, deals closing soon, only the emails that look important (skip newsletters and promotions),",
+        "tasks due today or overdue, team members' overdue tasks (by name), deals closing soon, only the emails that look important (skip newsletters and promotions),",
         "expense reports waiting for approval, and any holiday coming up. Keep numbers exact, say amounts in rupees, about 120 to 180 words.",
         "If a source is not connected or unavailable, mention it in a few words. Plain sentences for text-to-speech: no lists, symbols or markdown.",
         "", data,
@@ -2106,7 +2178,7 @@ button.dock-label:hover { color: var(--cyan); }
     userName: "", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
     tamil: false, speak: true,
     voiceEngine: "gemini", fastVoice: true, geminiVoiceEn: "Charon", geminiVoiceTa: "Kore", pcVoiceEn: "", pcVoiceTa: "", ttsModel: "",
-    wakeWord: true, pauseSeconds: 1.5, conversation: true, geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
+    markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
@@ -2119,7 +2191,7 @@ button.dock-label:hover { color: var(--cyan); }
   // ---------- Jo's brain ----------
   let agent = null;
   function buildTools() {
-    return new Tools({ bridge: sharedBridge(), memory: learned });
+    return new Tools({ bridge: sharedBridge(), memory: learned, markRead: settings.markRead !== false });
   }
   // One bridge for the whole page, so the panels, the brief and your questions share what was
   // just fetched from Zoho (a new one only when the bridge settings change).
@@ -2146,10 +2218,10 @@ button.dock-label:hover { color: var(--cyan); }
   const reactor = $("reactor"), stateEl = $("state");
   const TOOL_LABELS = {
     get_unread_mail: "CHECKING MAIL", search_mail: "SEARCHING MAIL", read_mail: "READING MAIL",
-    send_email: "SENDING MAIL", reply_email: "SENDING REPLY",
+    send_email: "SENDING MAIL", reply_email: "SENDING REPLY", save_draft: "SAVING DRAFT",
     crm_search: "SEARCHING CRM", crm_get_record: "READING CRM", crm_query: "QUERYING CRM", crm_my_tasks: "CHECKING TASKS",
     crm_meetings: "CHECKING MEETINGS", crm_pipeline: "CHECKING PIPELINE", crm_create_lead: "CREATING LEAD", crm_add_note: "ADDING NOTE",
-    crm_create_task: "CREATING TASK", crm_create_meeting: "ADDING MEETING", crm_update_record: "UPDATING CRM", crm_complete_task: "UPDATING TASK",
+    crm_create_task: "CREATING TASK", team_members: "CHECKING TEAM", team_tasks: "CHECKING TEAM TASKS", crm_create_meeting: "ADDING MEETING", crm_update_record: "UPDATING CRM", crm_complete_task: "UPDATING TASK",
     expense_list: "CHECKING EXPENSES", expense_reports: "CHECKING REPORTS", expense_categories: "CHECKING CATEGORIES", add_expense: "ADDING EXPENSE",
     people_profile: "CHECKING PROFILE", leave_balance: "CHECKING LEAVE", holidays: "CHECKING HOLIDAYS", apply_leave: "APPLYING LEAVE",
     check_in: "CHECKING IN", check_out: "CHECKING OUT", web_search: "SEARCHING THE WEB",
@@ -2705,6 +2777,7 @@ button.dock-label:hover { color: var(--cyan); }
       $("hud-latency").textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s`;
       voiceTimer = { t: performance.now(), el: transcript.lastElementChild?.querySelector(".tools") };
       renderTasks(); renderAgenda();
+      if (used.includes("read_mail")) checkMail(); // it was just marked read in Zoho Mail
       followUpPending = voice; // listen again once the answer has been spoken
       speak(reply);
     } catch (e) {
