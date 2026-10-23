@@ -1,596 +1,320 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="navy">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jo Office</title>
-<meta name="description" content="Jo Office: a voice assistant for Zoho Mail, Zoho CRM, Zoho Expense and Zoho People.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23030A16' stroke='%233EE6FF' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%233EE6FF'/%3E%3C/svg%3E">
+<meta name="description" content="Jo Office: a voice assistant for Zoho Mail, Zoho CRM, Zoho Expense and Zoho Calendar.">
+<meta name="theme-color" content="#0E1726">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1726'/%3E%3Cg fill='%234CC9F0'%3E%3Crect x='14' y='26' width='5' height='12' rx='2'/%3E%3Crect x='23' y='18' width='5' height='28' rx='2'/%3E%3Crect x='32' y='22' width='5' height='20' rx='2'/%3E%3Crect x='41' y='14' width='5' height='36' rx='2'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&family=Noto+Sans+Tamil:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Tamil:wght@400;600&display=swap" rel="stylesheet">
 <style>
-/* Jo HUD: an original holographic "AI assistant" look (dark navy, glowing cyan). */
-:root {
-  --bg: #02070F;
-  --bg2: #061528;
-  --cyan: #3EE6FF;
-  --cyan-2: #7DF1FF;
-  --cyan-dim: rgba(62, 230, 255, 0.35);
-  --cyan-faint: rgba(62, 230, 255, 0.08);
-  --amber: #FFB547;
-  --red: #FF5C7A;
-  --green: #4DFFB4;
-  --text: #CFEFFF;
-  --muted: #6E8FA8;
-  --panel: rgba(6, 24, 44, 0.55);
-  --line: rgba(62, 230, 255, 0.22);
-  --head: "Orbitron", "Segoe UI", system-ui, sans-serif;
-  --body: "Rajdhani", "Noto Sans Tamil", "Segoe UI", system-ui, sans-serif;
-  --spin: 1;
+/* Jo Office: a calm, conversation-first layout with a live voice wave bar.
+   Three themes share one set of colour tokens; Midnight navy is the default. */
+:root, [data-theme="navy"] {
+  --bg: #0E1726; --side: #111C2E; --card: #16233A; --card-2: #1B2A44; --line: #22324D; --line-2: #2E4266;
+  --text: #E6EDF7; --sub: #8FA3BF; --muted: #62738D;
+  --acc: #4CC9F0; --acc-bg: #163A52; --acc-text: #0E1726;
+  --ok: #3FB950; --warn: #D29922; --bad: #E5534B; --bad-bg: rgba(229, 83, 75, 0.12);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+[data-theme="graphite"] {
+  --bg: #1E2124; --side: #24282C; --card: #2B3035; --card-2: #31373D; --line: #363C42; --line-2: #454C54;
+  --text: #ECEFF1; --sub: #9AA4AD; --muted: #6E7881;
+  --acc: #2EC4A6; --acc-bg: #1F4A42; --acc-text: #10201C;
+  --ok: #3FB950; --warn: #D29922; --bad: #E5534B; --bad-bg: rgba(229, 83, 75, 0.12);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --bg: #F6F7F9; --side: #EEF1F5; --card: #FFFFFF; --card-2: #F3F6FA; --line: #DDE2E8; --line-2: #C9D1DB;
+  --text: #1B2430; --sub: #5B6776; --muted: #8A95A3;
+  --acc: #1F6FEB; --acc-bg: #DCE9FD; --acc-text: #FFFFFF;
+  --ok: #1A7F37; --warn: #9A6700; --bad: #CF222E; --bad-bg: #FFEBE9;
+  --shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
-  margin: 0;
-  color: var(--text);
-  font-family: var(--body);
-  font-size: 16px;
-  background:
-    radial-gradient(ellipse 60% 50% at 50% 45%, rgba(40, 60, 120, 0.22), transparent 70%),
-    linear-gradient(180deg, #0c1222, #070b16);
-  overflow: hidden;
-}
-:lang(ta), .ta { font-family: "Noto Sans Tamil", var(--body); }
-button, input { font: inherit; color: inherit; }
-a { color: var(--cyan); }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 "Inter", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+:lang(ta) body, .ta { font-family: "Noto Sans Tamil", "Inter", system-ui, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--acc); }
+svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
+[hidden] { display: none !important; }
 
-/* ---------- background layers ---------- */
-#particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-.state, .caption { text-shadow: 0 0 8px var(--cyan-dim), 0 0 3px #070b16; }
-.grid-bg {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image:
-    linear-gradient(rgba(62, 230, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(62, 230, 255, 0.035) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, #000 30%, transparent 85%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, #000 30%, transparent 85%);
-}
-.scanline {
-  position: fixed; left: 0; right: 0; top: -20%; height: 20%; z-index: 0; pointer-events: none;
-  background: linear-gradient(180deg, transparent, rgba(62, 230, 255, 0.05), transparent);
-  animation: scan 9s linear infinite;
-}
-@keyframes scan { to { transform: translateY(600%); } }
+/* ---------- frame ---------- */
+.app { height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.topbar { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-mark { display: inline-flex; align-items: center; gap: 2px; height: 20px; }
+.brand-mark i { display: block; width: 3px; border-radius: 2px; background: var(--acc); }
+.brand-mark i:nth-child(1) { height: 8px; } .brand-mark i:nth-child(2) { height: 16px; } .brand-mark i:nth-child(3) { height: 11px; } .brand-mark i:nth-child(4) { height: 19px; }
+.brand-name { font-weight: 600; font-size: 16px; white-space: nowrap; }
+.brand-sub { color: var(--sub); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.systems { list-style: none; display: flex; gap: 12px; margin: 0 0 0 auto; padding: 0; font-size: 12px; color: var(--sub); }
+.systems li { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.systems .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.systems .ok .dot { background: var(--ok); } .systems .err .dot { background: var(--bad); } .systems .ready .dot { background: var(--warn); }
+.top-actions { display: flex; align-items: center; gap: 6px; }
+.clock { font-variant-numeric: tabular-nums; color: var(--sub); font-size: 13px; margin-right: 4px; }
+.icon-btn { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--sub); }
+.icon-btn:hover { background: var(--card); color: var(--text); }
+.icon-btn.wake.on { color: var(--acc); }
+.icon-btn.wake.live { color: var(--acc); background: var(--acc-bg); }
+.lang { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg { background: none; border: 0; padding: 4px 9px; font-size: 12px; color: var(--sub); }
+.seg.on { background: var(--acc-bg); color: var(--acc); }
+.only-phone { display: none; }
 
-/* ---------- top bar ---------- */
-.topbar {
-  position: relative; z-index: 2;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 24px; border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(3, 14, 28, 0.85), rgba(3, 14, 28, 0.2));
-}
-.brand { display: flex; align-items: baseline; gap: 14px; }
-.brand-mark { font-family: var(--head); font-weight: 700; font-size: 22px; letter-spacing: 6px; color: var(--cyan); text-shadow: 0 0 12px var(--cyan-dim); }
-.brand-sub { font-family: var(--head); font-size: 11px; letter-spacing: 3px; color: var(--muted); }
-#online { color: var(--green); }
-.top-actions { display: flex; align-items: center; gap: 10px; }
-.lang { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
-.seg { background: transparent; border: 0; padding: 6px 12px; cursor: pointer; color: var(--muted); font-size: 14px; }
-.seg.on { background: rgba(62, 230, 255, 0.16); color: var(--cyan); }
-.icon-btn {
-  width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer;
-  background: transparent; border: 1px solid var(--line); border-radius: 50%; color: var(--cyan);
-}
-.icon-btn svg { width: 18px; height: 18px; fill: currentColor; }
-.icon-btn.wake { color: var(--muted, #6b8aa3); opacity: 0.7; }
-.icon-btn.wake.on { color: var(--cyan); opacity: 1; }
-.icon-btn.wake.live { box-shadow: 0 0 0 2px var(--cyan-dim), 0 0 12px var(--cyan-dim); animation: wake-breathe 2.4s ease-in-out infinite; }
-@keyframes wake-breathe { 50% { box-shadow: 0 0 0 4px transparent, 0 0 18px var(--cyan-dim); } }
-@media (prefers-reduced-motion: reduce) { .icon-btn.wake.live { animation: none; } }
-.icon-btn:hover, .seg:hover { box-shadow: 0 0 10px var(--cyan-dim); }
+.main { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 0; }
 
-/* ---------- layout ---------- */
-/* Desktop: today | Jo's core | conversation, with systems and quick commands docked below. */
-.hud {
-  position: relative; z-index: 1;
-  display: grid; gap: 14px 20px; padding: 14px 22px 12px;
-  grid-template-columns: 290px minmax(0, 1fr) 380px;
-  grid-template-rows: minmax(0, 1fr) auto;
-  grid-template-areas: "today stage convo" "dock dock dock";
-  height: calc(100vh - 66px);
-}
-#today-panel { grid-area: today; }
-.stage { grid-area: stage; }
-.convo { grid-area: convo; }
-.dock { grid-area: dock; }
-.panel {
-  position: relative; overflow-y: auto; padding: 18px 18px 14px;
-  background: var(--panel); border: 1px solid var(--line);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
-  animation: rise .7s cubic-bezier(.2, .8, .2, 1) both;
-}
-#convo-panel { animation-delay: .12s; }
-.dock { animation: rise .7s .24s cubic-bezier(.2, .8, .2, 1) both; }
-@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
-.panel::before, .panel::after {
-  content: ""; position: absolute; width: 22px; height: 22px; border: 2px solid var(--cyan); pointer-events: none;
-}
-.panel::before { top: 6px; right: 6px; border-left: 0; border-bottom: 0; }
-.panel::after { bottom: 6px; left: 6px; border-right: 0; border-top: 0; }
-.panel-title {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin: 6px 0 12px; font-family: var(--head); font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--cyan);
-}
-.panel-title span::before { content: "▸ "; color: var(--cyan-dim); }
-.panel-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); order: 1; }
-.panel-title .mini { order: 2; }
-.mini { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; }
-.mini:hover { color: var(--cyan); }
-.muted { color: var(--muted); }
+/* ---------- today panel ---------- */
+.today { background: var(--side); border-right: 1px solid var(--line); overflow-y: auto; padding: 14px 14px 20px; }
+.today-date { color: var(--sub); font-size: 13px; margin-bottom: 12px; }
+.block { margin-bottom: 18px; }
+.block h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--sub); }
+.block h2 > span:first-child { flex: 1; }
+.count { font-weight: 600; color: var(--text); text-transform: none; letter-spacing: 0; }
+.count.warn { color: var(--bad); }
+.mini { background: none; border: 0; color: var(--muted); font-size: 14px; padding: 2px 4px; border-radius: 6px; }
+.mini:hover { color: var(--text); background: var(--card); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.list li { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 13px; line-height: 1.4; }
+.list li.muted { background: none; border-style: dashed; color: var(--muted); }
+.list .sub { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; }
+.list .bad { color: var(--bad); }
+.agenda li { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 8px; }
+.agenda .when { color: var(--acc); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.agenda .now { border-color: var(--acc); }
+.mail li { cursor: pointer; }
+.mail li:hover, .team li:hover { border-color: var(--line-2); }
+.mail li.fresh { border-left: 3px solid var(--acc); }
+.mail .from { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail .subj { color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail .meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.tasks li { display: flex; gap: 8px; align-items: flex-start; }
+.tasks input[type="checkbox"] { margin-top: 3px; accent-color: var(--acc); }
+.tasks .t { flex: 1; min-width: 0; }
+.tasks .due { color: var(--sub); font-size: 12px; }
+.tasks .due.soon { color: var(--bad); }
+.add-task { display: grid; grid-template-columns: minmax(0, 1fr) 118px 30px; gap: 6px; margin-bottom: 8px; }
+.add-task input { min-width: 0; padding: 6px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; outline: none; }
+.add-task input:focus { border-color: var(--acc); }
+.add-task button { border: 1px solid var(--line); background: var(--card); border-radius: 8px; color: var(--acc); }
 
-/* ---------- bottom dock: systems + quick commands ---------- */
-.dock {
-  position: relative; display: flex; align-items: center; gap: 22px; min-width: 0;
-  padding: 10px 16px; border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(6, 24, 44, .72), rgba(3, 12, 24, .82));
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-}
-.dock::before { /* a light that runs along the top edge */
-  content: ""; position: absolute; top: -1px; left: 0; width: 18%; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-  animation: run 6s linear infinite;
-}
-@keyframes run { from { left: -18%; } to { left: 100%; } }
-.dock-group { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.dock-group.grow { flex: 1; }
-button.dock-label { background: none; border: 0; padding: 0; cursor: pointer; }
-button.dock-label:hover { color: var(--cyan); }
-/* Systems collapse to a row of status dots plus a summary; tap to see each name. */
-.sys-summary {
-  display: none; background: none; border: 0; padding: 0; cursor: pointer;
-  font-family: var(--head); font-size: 11px; letter-spacing: 2px; color: var(--green); white-space: nowrap;
-}
-.sys-summary.warn { color: var(--amber); }
-.sys.collapsed .sys-summary { display: inline; }
-.sys.collapsed .systems { gap: 6px; flex-wrap: nowrap; }
-.sys.collapsed .systems .name, .sys.collapsed .systems .val { display: none; }
-.sys.collapsed .systems li { cursor: help; }
-.dock-label { font-family: var(--head); font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--cyan-dim); writing-mode: vertical-rl; transform: rotate(180deg); }
-.systems { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
-.systems li { display: flex; align-items: center; gap: 7px; font-size: 14px; white-space: nowrap; }
-.systems .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
-.systems .ok .dot { background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 2.8s ease-in-out infinite; }
-.systems .off .dot { background: transparent; border: 1px solid var(--muted); }
-.systems .err .dot { background: var(--red); box-shadow: 0 0 8px var(--red); }
-.systems .off .name { color: var(--muted); }
-.systems .val { font-family: var(--head); font-size: 9px; letter-spacing: 1.5px; color: var(--muted); }
-.systems .ok .val { color: var(--green); }
-.systems .err .val { color: var(--red); }
-@keyframes blink { 50% { opacity: .55; } }
-.quick { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
-.quick::-webkit-scrollbar { display: none; }
-.quick button {
-  flex: none; padding: 8px 14px; cursor: pointer; font-size: 15px; font-weight: 600; white-space: nowrap;
-  background: rgba(62, 230, 255, 0.06); border: 1px solid var(--line); border-bottom: 2px solid var(--cyan);
-  transition: background .2s, box-shadow .2s, transform .2s;
-}
-.quick button:hover { background: rgba(62, 230, 255, 0.16); box-shadow: 0 0 16px rgba(62, 230, 255, .25); transform: translateY(-2px); }
-.quick button[data-brief] { border-bottom-color: var(--amber); }
+/* ---------- conversation ---------- */
+.convo { display: flex; flex-direction: column; min-height: 0; max-width: 980px; width: 100%; margin: 0 auto; padding: 0 20px; }
+.convo > .transcript { flex: 1; min-height: 0; }
+.convo-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 6px; color: var(--sub); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.convo-head .mini { text-transform: none; letter-spacing: 0; font-size: 12px; }
+.brief-banner { display: flex; align-items: center; gap: 10px; background: var(--acc-bg); color: var(--acc); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; font-size: 14px; }
+.brief-banner span { flex: 1; }
+.brief-banner button:not(.mini) { border: 1px solid var(--acc); background: none; color: var(--acc); border-radius: 8px; padding: 3px 10px; }
+.transcript { overflow-y: auto; padding: 8px 2px 16px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
+.msg { display: flex; flex-direction: column; max-width: 100%; }
+.msg.me { align-items: flex-end; }
+.msg .who { font-size: 11px; color: var(--muted); margin: 0 4px 3px; text-transform: uppercase; letter-spacing: .05em; }
+.msg .bubble { font-size: 15.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.me .bubble { background: var(--acc-bg); color: var(--text); padding: 9px 14px; border-radius: 16px 16px 4px 16px; max-width: 78%; }
+.msg.jo .bubble { max-width: 92%; padding: 2px 4px; }
+.msg.jo.err .bubble { color: var(--bad); }
+.msg .bubble.editable { cursor: pointer; }
+.msg .bubble.editable:hover { outline: 1px solid var(--acc); }
+.msg .tools { font-size: 11px; color: var(--muted); margin: 4px 4px 0; }
 
-/* ---------- center stage ---------- */
-.stage {
-  --level: 0;
-  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0;
-}
-.stage::before { /* glow that breathes with Jo's voice */
-  content: ""; position: absolute; left: 50%; top: 42%; width: 70%; aspect-ratio: 1; transform: translate(-50%, -50%) scale(calc(.9 + var(--level) * .25));
-  background: radial-gradient(circle, rgba(62, 230, 255, calc(.05 + var(--level) * .16)), transparent 62%);
-  pointer-events: none; z-index: -1;
-}
-.hud-read { position: absolute; display: flex; flex-direction: column; gap: 2px; font-family: var(--head); pointer-events: none; }
-.hud-read .k { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
-.hud-read .v { font-size: 15px; letter-spacing: 1px; color: #E9FDFF; text-shadow: 0 0 10px var(--cyan-dim); }
-.hud-read::before { content: ""; position: absolute; width: 14px; height: 14px; border: 1px solid var(--cyan-dim); }
-.hud-read.tl { top: 4px; left: 8px; padding: 10px 0 0 12px; }
-.hud-read.tl::before { top: 0; left: 0; border-right: 0; border-bottom: 0; }
-.hud-read.tr { top: 4px; right: 8px; padding: 10px 12px 0 0; text-align: right; }
-.hud-read.tr::before { top: 0; right: 0; border-left: 0; border-bottom: 0; }
-.hud-read.bl { bottom: 4px; left: 8px; padding: 0 0 10px 12px; }
-.hud-read.bl::before { bottom: 0; left: 0; border-right: 0; border-top: 0; }
-.hud-read.br { bottom: 4px; right: 8px; padding: 0 12px 10px 0; text-align: right; }
-.hud-read.br::before { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+/* answer cards */
+.card { margin-top: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; max-width: 760px; }
+.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 600; font-size: 13px; }
+.card-head span { flex: 1; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.tag { font-size: 11.5px; color: var(--sub); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.rows { display: grid; }
+.r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 12px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.r:first-child { border-top: 0; }
+.r .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r .amt { font-variant-numeric: tabular-nums; text-align: right; }
+.r .date { color: var(--sub); font-size: 12px; white-space: nowrap; }
+.r .overdue { color: var(--bad); }
+.r a, .card a.all { color: var(--acc); text-decoration: none; font-size: 12px; white-space: nowrap; }
+.r a:hover, .card a.all:hover { text-decoration: underline; }
+.r.total { font-weight: 600; border-top: 1px solid var(--line-2); }
+.card-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.limit { color: var(--warn); font-size: 12px; margin-top: 6px; }
+.mailrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
+.mailrow:first-child { border-top: 0; }
+.mailrow .who2 { font-weight: 500; font-size: 13px; }
+.mailrow .subj { color: var(--sub); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--line-2); background: none; color: var(--text); border-radius: 8px; padding: 4px 10px; font-size: 12.5px; }
+.btn:hover { border-color: var(--acc); color: var(--acc); }
+.btn.primary { border-color: var(--acc); color: var(--acc); background: var(--acc-bg); }
+.confirm-card { border-color: var(--acc); }
+.confirm-card .what { font-size: 12px; color: var(--sub); margin-bottom: 4px; }
 
-.reactor {
-  width: min(400px, 44vh, 92%); aspect-ratio: 1; flex: none; padding: 0;
-  background: none; border: 0; cursor: pointer; border-radius: 50%;
-  animation: boot 1.2s cubic-bezier(.2, .8, .2, 1) both;
-}
-@keyframes boot { from { opacity: 0; transform: scale(.82) rotate(-30deg); } }
-.reactor:focus-visible { outline: 2px solid var(--cyan); outline-offset: 6px; }
-.reactor svg { width: 100%; height: 100%; overflow: visible; }
-.ring circle { fill: none; stroke: var(--cyan); transition: stroke .4s, opacity .4s; }
-.ring, .orbit, .sweep { transform-origin: 200px 200px; transform-box: view-box; }
-.r0 circle { stroke-width: 7; opacity: .25; }
-.r1 circle { stroke-width: 4; opacity: .45; }
-.r2 circle { stroke-width: 2.5; opacity: .75; }
-.r3 circle { stroke-width: 1; opacity: .3; }
-.r4 circle { stroke-width: 7; opacity: .85; }
-.r5 circle { stroke-width: 1.5; opacity: .35; }
-.r0 { animation: spin calc(120s / var(--spin)) linear infinite reverse; }
-.r1 { animation: spin calc(60s / var(--spin)) linear infinite; }
-.r2 { animation: spin calc(34s / var(--spin)) linear infinite reverse; }
-.r4 { animation: spin calc(22s / var(--spin)) linear infinite; }
-.r5 { animation: spin calc(16s / var(--spin)) linear infinite reverse; }
-.orbit circle { fill: var(--cyan-2); filter: drop-shadow(0 0 4px var(--cyan)); }
-.o1 { animation: spin calc(14s / var(--spin)) linear infinite; }
-.o2 { animation: spin calc(9s / var(--spin)) linear infinite reverse; }
-.sweep { animation: spin calc(5s / var(--spin)) linear infinite; opacity: .7; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.bars line { stroke: var(--cyan); stroke-width: 3; stroke-linecap: round; opacity: .55; transition: opacity .2s; }
-.core-halo { opacity: .55; transform-origin: 200px 200px; transform-box: view-box; animation: breathe 4s ease-in-out infinite; }
-.core-ring { fill: rgba(2, 10, 20, .65); stroke: var(--cyan-2); stroke-width: 3; }
-.core-text { font-family: var(--head); font-weight: 700; font-size: 38px; letter-spacing: 6px; fill: #E9FDFF; }
-@keyframes breathe { 50% { opacity: .85; transform: scale(1.06); } }
+/* small quick buttons */
+.quick { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 0; }
+.quick button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--card); color: var(--sub); border-radius: 999px; padding: 3px 10px 3px 8px; font-size: 12px; line-height: 1.6; }
+.quick button svg { width: 14px; height: 14px; }
+.quick button:hover { color: var(--acc); border-color: var(--acc); }
+.ask { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line-2); background: var(--card); border-radius: 14px; padding: 5px 5px 5px 14px; margin-bottom: 12px; }
+.ask:focus-within { border-color: var(--acc); }
+.ask input { flex: 1; min-width: 0; background: none; border: 0; outline: none; font-size: 15px; padding: 6px 0; }
+.ask .send { width: 36px; height: 36px; border: 0; border-radius: 10px; background: none; color: var(--sub); display: inline-flex; align-items: center; justify-content: center; }
+.ask .send:hover { color: var(--acc); background: var(--acc-bg); }
 
-.reactor.listening { --spin: 2.2; }
-.reactor.listening .core-halo { animation-duration: 1.2s; opacity: .9; }
-.reactor.thinking { --spin: 4; }
-.reactor.thinking .ring circle, .reactor.thinking .core-ring { stroke: var(--amber); }
-.reactor.thinking .bars line { stroke: var(--amber); }
-.reactor.thinking .core-halo { animation-duration: .9s; }
-.reactor.speaking { --spin: 1.6; }
-.reactor.speaking .bars line { opacity: .95; filter: drop-shadow(0 0 3px var(--cyan)); }
-.reactor.speaking .core-halo { animation: none; opacity: calc(.6 + var(--level) * .4); transform: scale(calc(1 + var(--level) * .18)); }
-.reactor.error .ring circle, .reactor.error .core-ring { stroke: var(--red); }
-
-.wave { width: min(560px, 90%); height: 54px; flex: none; margin-top: -6px; }
-.state {
-  margin: 2px 0 6px; font-family: var(--head); font-size: 11px; letter-spacing: 3px; color: var(--cyan);
-  text-align: center; min-height: 16px;
-}
-.state.thinking { color: var(--amber); }
-
-/* Live captions: each word lights up as Jo says it. */
-.caption {
-  width: min(680px, 94%); max-height: 3.3em; overflow: hidden; text-align: center;
-  font-size: 22px; line-height: 1.1em; font-weight: 500; color: rgba(207, 239, 255, .35);
-  opacity: 0; transform: translateY(6px); transition: opacity .5s, transform .5s;
-  scroll-behavior: smooth;
-}
-.caption.show { opacity: 1; transform: none; }
-.caption .said { color: #E9FDFF; transition: color .25s; }
-.caption .now { color: var(--cyan-2); text-shadow: 0 0 14px var(--cyan); }
-
-/* Key figures from the reply, counted up as Jo speaks. */
-.figures { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 12px; min-height: 8px; }
-.figure {
-  position: relative; min-width: 120px; padding: 10px 16px 8px; text-align: center;
-  background: linear-gradient(180deg, rgba(62, 230, 255, .12), rgba(62, 230, 255, .03));
-  border: 1px solid var(--cyan-dim);
-  clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
-  animation: pop .6s cubic-bezier(.2, .9, .3, 1.3) both;
-}
-.figure::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
-.fig-value { font-family: var(--head); font-size: 24px; font-weight: 700; color: #E9FDFF; text-shadow: 0 0 12px var(--cyan-dim); }
-.fig-label { font-family: var(--head); font-size: 9px; letter-spacing: 2px; color: var(--cyan); margin-top: 3px; }
-@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.9); } }
-
-.brief-banner {
-  display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 8px 14px;
-  border: 1px solid var(--amber); color: var(--amber); background: rgba(255, 181, 71, .08);
-  font-family: var(--head); font-size: 12px; letter-spacing: 2px;
-}
-.brief-banner[hidden] { display: none; }
-.brief-banner button { background: none; border: 1px solid currentColor; color: inherit; padding: 4px 12px; cursor: pointer; }
-
-/* ---------- conversation panel ---------- */
-.convo { display: flex; flex-direction: column; overflow: hidden; }
-.transcript {
-  flex: 1; min-height: 0; overflow-y: auto; padding: 4px 2px 12px;
-  mask-image: linear-gradient(180deg, transparent, #000 20px);
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 20px);
-}
-.msg { display: flex; margin: 10px 0; animation: msg-in .45s cubic-bezier(.2, .8, .2, 1) both; }
-.msg > div { max-width: 92%; }
-@keyframes msg-in { from { opacity: 0; transform: translateX(var(--from, -12px)); } }
-.msg.me { --from: 12px; }
-.msg .who { font-family: var(--head); font-size: 10px; letter-spacing: 2px; color: var(--muted); margin-bottom: 4px; }
-.msg.me .who { text-align: right; }
-.msg .bubble { padding: 9px 13px; line-height: 1.4; font-size: 16px; white-space: pre-wrap; }
-.msg.me { justify-content: flex-end; }
-.msg.me .bubble { background: rgba(62, 230, 255, 0.14); border: 1px solid var(--cyan-dim); border-radius: 14px 14px 2px 14px; }
-.msg.jo .bubble { background: rgba(4, 18, 34, 0.75); border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: 2px 14px 14px 14px; }
-.msg.jo.err .bubble { border-left-color: var(--red); }
-.msg .tools { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--head); letter-spacing: .5px; }
-
-.ask { display: flex; gap: 8px; align-items: center; padding-top: 10px; border-top: 1px solid var(--line); }
-.ask input {
-  flex: 1; min-width: 0; padding: 12px 14px; font-size: 16px; background: rgba(2, 10, 20, .7); border: 1px solid var(--line); outline: none;
-}
-.ask input:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(62, 230, 255, .2); }
-.send, .mic { display: grid; place-items: center; cursor: pointer; border: 1px solid var(--cyan); flex: none; }
-.send { width: 46px; height: 46px; background: transparent; color: var(--cyan); }
-.mic { width: 52px; height: 52px; border-radius: 50%; background: radial-gradient(circle, rgba(62, 230, 255, .35), rgba(62, 230, 255, .08)); color: #E9FDFF; box-shadow: 0 0 18px rgba(62, 230, 255, .35); }
-.mic.live { animation: pulse 1s ease-in-out infinite; border-color: var(--cyan-2); }
-.send svg, .mic svg { width: 22px; height: 22px; fill: currentColor; }
-@keyframes pulse { 50% { box-shadow: 0 0 32px rgba(62, 230, 255, .8); } }
-
-/* ---------- right panel ---------- */
-.clock { text-align: center; margin: 4px 0 18px; }
-#clock-time { font-family: var(--head); font-size: 44px; font-weight: 500; letter-spacing: 3px; color: #E9FDFF; text-shadow: 0 0 16px var(--cyan-dim); }
-#clock-date { font-family: var(--head); font-size: 11px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
-.agenda, .tasks { list-style: none; margin: 0 0 20px; padding: 0; }
-.agenda li { display: grid; grid-template-columns: 70px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px dashed rgba(62, 230, 255, 0.12); }
-.agenda li.muted { display: block; }
-.agenda .when { font-family: var(--head); font-size: 11px; color: var(--cyan); letter-spacing: 1px; padding-top: 3px; }
-.agenda .what { font-weight: 600; }
-.agenda .where { font-size: 13px; color: var(--muted); }
-.agenda .jo-tag { font-size: 10px; letter-spacing: 1px; color: var(--amber); margin-left: 6px; font-family: var(--head); }
-.mail { list-style: none; margin: 0 0 20px; padding: 0; }
-.mail li { padding: 7px 0; border-bottom: 1px dashed rgba(62, 230, 255, 0.12); cursor: pointer; }
-.mail li.muted { cursor: default; }
-.mail li:not(.muted):hover .subj { color: var(--cyan); }
-.mail .from { font-weight: 600; }
-.mail .subj { font-size: 14px; }
-.mail .meta { font-size: 12px; color: var(--muted); }
-.mail .folder { font-family: var(--head); font-size: 9px; letter-spacing: 1px; color: var(--amber); border: 1px solid rgba(255, 181, 71, .5); padding: 0 4px; margin-right: 6px; }
-.mail li.fresh { border-left: 2px solid var(--cyan); padding-left: 8px; }
-.mail-count { order: 2; font-family: var(--head); font-size: 11px; color: var(--amber); }
-.add-task { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-bottom: 8px; }
-.add-task input { padding: 8px 10px; background: rgba(2, 10, 20, .7); border: 1px solid var(--line); outline: none; min-width: 0; }
-.add-task input:focus { border-color: var(--cyan); }
-.add-task #task-due { grid-column: 1; color-scheme: dark; font-size: 14px; }
-.add-task button { grid-row: 1 / span 2; grid-column: 2; width: 44px; background: rgba(62, 230, 255, .12); border: 1px solid var(--cyan); color: var(--cyan); font-size: 22px; cursor: pointer; }
-.tasks li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px dashed rgba(62, 230, 255, 0.12); }
-.tasks input[type=checkbox] { appearance: none; width: 16px; height: 16px; margin-top: 3px; border: 1px solid var(--cyan); cursor: pointer; flex: none; }
-.tasks input[type=checkbox]:checked { background: var(--cyan); box-shadow: 0 0 8px var(--cyan-dim); }
-.tasks .t { flex: 1; }
-.tasks .due { font-size: 13px; color: var(--muted); }
-.tasks .due.soon { color: var(--amber); }
-.g-tag { font-family: var(--head); font-size: 9px; color: #8ab4ff; border: 1px solid rgba(138, 180, 255, .5); padding: 0 4px; margin-left: 6px; vertical-align: middle; }
-.tasks li.done .t { text-decoration: line-through; color: var(--muted); }
-.tasks .del { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 15px; }
-.tasks .del:hover { color: var(--red); }
+/* ---------- voice wave bar ---------- */
+.wavebar { display: flex; align-items: center; gap: 14px; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--side); }
+.wavebar .state { min-width: 128px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--acc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wavebar.idle .state { color: var(--sub); }
+.wavebar.error .state { color: var(--bad); }
+.wavebar .bars { flex: 1; height: 44px; border: 0; background: none; padding: 0; min-width: 0; }
+.wavebar canvas { width: 100%; height: 100%; display: block; }
+.wavebar .core { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.mic { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--acc); color: var(--acc-text); display: inline-flex; align-items: center; justify-content: center; flex: none; transition: transform .15s; }
+.mic svg { width: 22px; height: 22px; }
+.mic:hover { transform: scale(1.05); }
+.mic.live { box-shadow: 0 0 0 6px var(--acc-bg); }
 
 /* ---------- settings drawer ---------- */
-.drawer-backdrop { position: fixed; inset: 0; z-index: 9; background: rgba(0, 4, 10, .6); }
-.drawer {
-  position: fixed; z-index: 10; top: 0; right: 0; bottom: 0; width: min(460px, 100vw);
-  display: flex; flex-direction: column; background: rgba(4, 16, 30, .97); border-left: 1px solid var(--cyan-dim);
-  box-shadow: -10px 0 40px rgba(0, 0, 0, .6);
-}
-.drawer[hidden], .drawer-backdrop[hidden] { display: none; }
-.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
-.drawer-head h2 { margin: 0; font-family: var(--head); font-size: 15px; letter-spacing: 4px; color: var(--cyan); text-transform: uppercase; }
-.drawer-body { flex: 1; overflow-y: auto; padding: 4px 20px 24px; }
-.drawer section { padding: 14px 0 16px; border-bottom: 1px solid var(--line); }
-.drawer h3 { margin: 0 0 8px; font-family: var(--head); font-size: 11px; letter-spacing: 2px; color: var(--cyan); text-transform: uppercase; }
-.drawer label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0; }
-.drawer label input:not([type=checkbox]) { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; background: rgba(2, 10, 20, .8); border: 1px solid var(--line); outline: none; color-scheme: dark; }
-.drawer label input:focus { border-color: var(--cyan); }
-.drawer label select { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; background: rgba(2, 10, 20, .8); border: 1px solid var(--line); color: var(--text); outline: none; color-scheme: dark; }
-.drawer label select:focus { border-color: var(--cyan); }
-.voice-row { display: flex; align-items: flex-end; gap: 8px; }
-.voice-row label { flex: 1; margin-bottom: 0; }
-.voice-row .test { margin: 0 0 1px; white-space: nowrap; }
-.drawer label.row { display: flex; align-items: center; gap: 8px; color: var(--text); }
-.drawer details.direct { margin: 6px 0; }
-.drawer details.direct summary { cursor: pointer; color: var(--muted); font-size: 13px; }
-.hint { font-size: 13px; color: var(--muted); margin: 4px 0 8px; overflow-wrap: anywhere; }
-.test { margin-top: 6px; padding: 7px 14px; background: transparent; border: 1px solid var(--cyan-dim); color: var(--cyan); cursor: pointer; }
-.test:hover { background: rgba(62, 230, 255, .1); }
-.drawer-foot { padding-top: 16px; }
-.primary { width: 100%; padding: 12px; background: rgba(62, 230, 255, .18); border: 1px solid var(--cyan); color: #E9FDFF; font-family: var(--head); letter-spacing: 3px; cursor: pointer; }
-.test-out { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--text); margin: 12px 0 0; max-height: 220px; overflow: auto; }
-
-.toast {
-  position: fixed; z-index: 20; left: 50%; bottom: 28px; transform: translateX(-50%); max-width: min(560px, calc(100vw - 32px));
-  padding: 12px 18px; background: rgba(4, 16, 30, .95); border: 1px solid var(--cyan); box-shadow: 0 0 20px rgba(62, 230, 255, .3);
-}
-.toast[hidden] { display: none; }
-
-/* ---------- scrollbars ---------- */
-* { scrollbar-width: thin; scrollbar-color: var(--cyan-dim) transparent; }
-
-/* ---------- smaller screens: core, conversation, dock, then today ---------- */
-@media (max-width: 1100px) {
-  body { overflow: auto; }
-  .hud {
-    grid-template-columns: minmax(0, 1fr); grid-template-rows: none; height: auto; padding: 12px 16px 24px;
-    grid-template-areas: "stage" "convo" "dock" "today";
-  }
-  .stage { min-height: 62vh; padding: 30px 0 8px; }
-  .hud-read.bl, .hud-read.br { display: none; } /* mail and tasks are listed below on small screens */
-  .convo { height: 70vh; }
-  .dock { flex-direction: column; align-items: stretch; gap: 10px; }
-  .dock-label { writing-mode: horizontal-tb; transform: none; min-width: 52px; }
-  .quick { flex-wrap: nowrap; }
-  .brand-sub { display: none; }
-}
-.seg .short { display: none; }
-/* ---------- phones ---------- */
-@media (max-width: 600px) {
-  .topbar { padding: 8px 12px; }
-  .brand-mark { font-size: 18px; letter-spacing: 4px; }
-  .top-actions { gap: 6px; }
-  .icon-btn { width: 34px; height: 34px; }
-  .icon-btn svg { width: 16px; height: 16px; }
-  /* One language button: shows the current language, tap to switch. */
-  .lang .seg:not(.on) { display: none; }
-  .seg { padding: 6px 10px; min-width: 38px; }
-  .seg .long { display: none; }
-  .seg .short { display: inline; }
-  .hud { padding: 8px 10px 16px; gap: 12px; }
-  .stage { min-height: 0; padding: 34px 0 4px; }
-  .reactor { width: min(250px, 34vh); }
-  .wave { height: 40px; }
-  .caption { font-size: 18px; }
-  .figure { min-width: 96px; padding: 8px 10px 6px; }
-  .fig-value { font-size: 19px; }
-  .hud-read .v { font-size: 13px; }
-  .convo { height: 62vh; padding: 14px 12px 12px; }
-  .systems { gap: 6px 12px; }
-  .systems li { font-size: 13px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ring, .orbit, .sweep, .core-halo, .scanline, .mic.live, .dock::before, .systems .ok .dot,
-  .panel, .dock, .reactor, .msg, .figure { animation: none !important; }
-}
-
-/* Jo Office: a change waiting for "yes" */
-.msg .confirm { display: flex; gap: 8px; margin-top: 6px; }
-.msg .confirm button { padding: 6px 14px; border: 1px solid var(--cyan); background: rgba(62, 230, 255, 0.12); color: var(--cyan); cursor: pointer; font: inherit; letter-spacing: .04em; }
-.msg .confirm button.no { border-color: var(--line); color: var(--muted); background: none; }
-.msg .confirm button:hover { background: rgba(62, 230, 255, 0.24); }
-.drawer textarea.scopes { width: 100%; box-sizing: border-box; padding: 8px; font: 12px/1.4 monospace; background: rgba(2, 10, 20, .7); color: inherit; border: 1px solid var(--line); resize: vertical; }
-.msg .bubble.editable { cursor: pointer; }
-.msg .bubble.editable:hover { border-color: var(--cyan); }
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 20; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); background: var(--side); border-left: 1px solid var(--line); z-index: 21; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+.drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.drawer-head h2 { margin: 0; font-size: 16px; }
+.drawer-body { overflow-y: auto; padding: 4px 16px 20px; }
+.drawer section { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.drawer h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--acc); }
+.drawer label { display: block; font-size: 13px; color: var(--sub); margin: 10px 0 4px; }
+.drawer label.row { display: flex; gap: 8px; align-items: flex-start; color: var(--text); }
+.drawer input:not([type="checkbox"]), .drawer select, .drawer textarea { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; outline: none; }
+.drawer input:focus, .drawer select:focus, .drawer textarea:focus { border-color: var(--acc); }
+.drawer input[type="checkbox"] { accent-color: var(--acc); margin-top: 3px; }
+.drawer textarea.scopes { font: 12px/1.4 ui-monospace, Consolas, monospace; resize: vertical; }
+.hint { font-size: 12px; color: var(--muted); margin: 6px 0; }
+.voice-row { display: flex; gap: 8px; align-items: flex-end; }
+.voice-row label { flex: 1; }
+.test { border: 1px solid var(--line-2); background: none; color: var(--text); border-radius: 8px; padding: 6px 12px; margin-top: 8px; font-size: 13px; }
+.test:hover { border-color: var(--acc); color: var(--acc); }
+details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
+.drawer-foot { position: sticky; bottom: 0; background: var(--side); padding: 12px 0 0; }
+.drawer-foot .primary { width: 100%; padding: 10px; border: 0; border-radius: 10px; background: var(--acc); color: var(--acc-text); font-weight: 600; }
+.test-out { white-space: pre-wrap; font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--sub); margin: 10px 0 0; }
 .learned { list-style: none; margin: 4px 0 8px; padding: 0; max-height: 180px; overflow-y: auto; }
-.learned li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
-.learned li b { color: var(--cyan); font-weight: 600; }
+.learned li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.learned li b { color: var(--acc); font-weight: 600; }
+
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); max-width: min(560px, 92vw); background: var(--card-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 14px; font-size: 13.5px; box-shadow: var(--shadow); z-index: 30; }
+
+/* ---------- smaller screens ---------- */
+@media (max-width: 1100px) { .systems { display: none; } }
+@media (max-width: 820px) {
+  .only-phone { display: inline-flex; }
+  .main { grid-template-columns: minmax(0, 1fr); position: relative; }
+  .today { position: absolute; inset: 0 auto 0 0; width: min(320px, 88vw); z-index: 10; box-shadow: var(--shadow); transform: translateX(-102%); transition: transform .2s; }
+  .today.open { transform: none; }
+  .convo { padding: 0 12px; }
+  .brand-sub, .clock, #fullscreen { display: none; }
+  .wavebar .core { display: none; }
+  .wavebar .state { min-width: 0; width: 92px; font-size: 11px; }
+  .msg.me .bubble { max-width: 90%; }
+  .r { grid-template-columns: minmax(0, 1fr) auto; }
+  .r .date { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
 
 </style>
 </head>
 <body>
-<canvas id="particles" aria-hidden="true"></canvas>
-<div class="grid-bg" aria-hidden="true"></div>
-<div class="scanline" aria-hidden="true"></div>
-
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark">J.O.</span>
-    <span class="brand-sub">OFFICE ASSISTANT · <span id="online">ONLINE</span></span>
-  </div>
-  <div class="top-actions">
-    <div class="lang" role="group" aria-label="Language">
-      <button id="lang-en" class="seg" title="English (tap to switch)">EN</button><button id="lang-ta" class="seg" title="தமிழ் (tap to switch)"><span class="long">தமிழ்</span><span class="short">த</span></button>
+<div class="app">
+  <header class="topbar">
+    <button class="icon-btn only-phone" id="toggle-today" aria-label="Today" title="Today"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></button>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span class="brand-name">Jo Office</span>
+      <span class="brand-sub" id="greeting"></span>
     </div>
-    <button id="wake" class="icon-btn wake" aria-label='Wake word "Jo"'>
-      <svg viewBox="0 0 24 24"><path d="M17 20c-.3 0-.6-.1-.8-.2-.7-.4-1.2-.9-1.7-2.4-.5-1.5-1.4-2.2-2.3-2.9-.8-.6-1.6-1.2-2.3-2.4A5.6 5.6 0 0 1 9 9c0-3.4 2.6-6 6-6s6 2.6 6 6h-2c0-2.2-1.8-4-4-4s-4 1.8-4 4c0 .8.2 1.4.6 2.1.5.9 1.2 1.4 1.8 1.9 1.1.8 2.3 1.7 3 3.8.4 1.1.6 1.4.9 1.4.6 0 1-.4 1-1h2a3 3 0 0 1-3 3zM7.6 2.6 6.2 1.2A11 11 0 0 0 3 9a11 11 0 0 0 3.2 7.8l1.4-1.4A9 9 0 0 1 5 9c0-2.5 1-4.7 2.6-6.4zM11.5 9a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
-    </button>
-    <button id="fullscreen" class="icon-btn" aria-label="Full screen"></button>
-    <button id="mute" class="icon-btn" title="Speak replies aloud" aria-label="Toggle speech"></button>
-    <button id="open-settings" class="icon-btn" title="Settings" aria-label="Settings">
-      <svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 3h-4l-.4 2.7a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7 7 0 0 0 1.7 1L11 21h4l.4-2.7a7 7 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
-    </button>
-  </div>
-</header>
-
-<main class="hud">
-  <!-- Left: today -->
-  <aside class="panel" id="today-panel">
-    <div class="clock">
-      <div id="clock-time">--:--</div>
-      <div id="clock-date">—</div>
-    </div>
-
-    <h2 class="panel-title"><span>Meetings</span><button class="mini" id="refresh-agenda" title="Refresh">↻</button></h2>
-    <ul class="agenda" id="agenda"><li class="muted">Zoho CRM not connected.</li></ul>
-
-    <h2 class="panel-title"><span>Mail</span><span class="mail-count" id="mail-count"></span><button class="mini" id="refresh-mail" title="Check mail now">↻</button></h2>
-    <ul class="mail" id="mail"><li class="muted">Zoho Mail not connected.</li></ul>
-
-    <h2 class="panel-title"><span>CRM tasks</span><button class="mini" id="refresh-tasks" title="Refresh">↻</button></h2>
-    <form class="add-task" id="add-task">
-      <input id="task-title" placeholder="New CRM task" aria-label="New CRM task">
-      <input id="task-due" type="date" aria-label="Due date">
-      <button type="submit" aria-label="Add task">+</button>
-    </form>
-    <ul class="tasks" id="tasks"></ul>
-  </aside>
-
-  <!-- Center: Jo's core and voice visualizer -->
-  <section class="stage" id="stage">
-    <div class="hud-read tl"><span class="k">Core</span><span class="v" id="hud-model">—</span></div>
-    <div class="hud-read tr"><span class="k">Last reply</span><span class="v" id="hud-latency">—</span></div>
-    <div class="hud-read bl"><span class="k">Unread mail</span><span class="v" id="hud-mail">—</span></div>
-    <div class="hud-read br"><span class="k">Open tasks</span><span class="v" id="hud-tasks">—</span></div>
-
-    <button id="reactor" class="reactor idle" aria-label="Talk to Jo (Space)">
-      <svg viewBox="0 0 400 400" aria-hidden="true">
-        <defs>
-          <radialGradient id="coreGlow">
-            <stop offset="0%" stop-color="#E9FDFF"/>
-            <stop offset="35%" stop-color="#7DF1FF"/>
-            <stop offset="70%" stop-color="rgba(62,230,255,.35)"/>
-            <stop offset="100%" stop-color="rgba(62,230,255,0)"/>
-          </radialGradient>
-          <linearGradient id="sweepGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="rgba(62,230,255,0)"/>
-            <stop offset="100%" stop-color="rgba(62,230,255,.28)"/>
-          </linearGradient>
-          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-        <g class="ring r0"><circle cx="200" cy="200" r="198" pathLength="360" stroke-dasharray="0.6 4.4"/></g>
-        <g class="ring r1"><circle cx="200" cy="200" r="188" pathLength="360" stroke-dasharray="1 5"/></g>
-        <g class="ring r2"><circle cx="200" cy="200" r="172" pathLength="360" stroke-dasharray="70 20 30 20"/></g>
-        <g class="orbit o1"><circle cx="200" cy="12" r="3.5"/></g>
-        <g class="orbit o2"><circle cx="200" cy="28" r="2.5"/></g>
-        <g class="ring r3"><circle cx="200" cy="200" r="154"/></g>
-        <g class="sweep"><path d="M200 200 L200 46 A154 154 0 0 1 333.4 123 Z" fill="url(#sweepGrad)"/></g>
-        <g class="ring r4" filter="url(#glow)"><circle cx="200" cy="200" r="136" pathLength="360" stroke-dasharray="40 14 8 14"/></g>
-        <g class="ring r5"><circle cx="200" cy="200" r="122" pathLength="360" stroke-dasharray="2 2"/></g>
-        <g id="bars" class="bars"></g>
-        <circle class="core-halo" cx="200" cy="200" r="96" fill="url(#coreGlow)"/>
-        <circle class="core-ring" cx="200" cy="200" r="62" filter="url(#glow)"/>
-        <text class="core-text" x="200" y="214" text-anchor="middle">JO</text>
-      </svg>
-    </button>
-    <canvas id="wave" class="wave" aria-hidden="true"></canvas>
-    <div class="state" id="state">STANDING BY</div>
-    <div class="caption" id="caption" aria-hidden="true"></div>
-    <div class="figures" id="figures" aria-hidden="true"></div>
-
-    <div class="brief-banner" id="brief-banner" hidden>
-      <span>Morning brief ready</span>
-      <button id="play-brief">▶ Play</button>
-      <button id="dismiss-brief" aria-label="Dismiss">✕</button>
-    </div>
-  </section>
-
-  <!-- Right: conversation -->
-  <aside class="panel convo" id="convo-panel">
-    <h2 class="panel-title"><span>Conversation</span><button class="mini" id="clear-convo" title="Start a new conversation">⟲</button></h2>
-    <div class="transcript" id="transcript" aria-live="polite"></div>
-    <form class="ask" id="ask-form" autocomplete="off">
-      <input id="ask-input" placeholder="Ask Jo Office anything…" aria-label="Ask Jo">
-      <button type="submit" class="send" aria-label="Send">
-        <svg viewBox="0 0 24 24"><path d="M2 21 23 12 2 3v7l15 2-15 2z"/></svg>
-      </button>
-      <button type="button" id="mic" class="mic" aria-label="Speak">
-        <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg>
-      </button>
-    </form>
-  </aside>
-
-  <!-- Bottom: systems and quick commands -->
-  <footer class="dock">
-    <div class="dock-group sys collapsed" id="dock-systems">
-      <button type="button" class="dock-label" id="toggle-systems" aria-expanded="false" title="Show or hide system details">Systems</button>
-      <button type="button" class="sys-summary" id="sys-summary" title="Show system details"></button>
-      <ul class="systems" id="systems"></ul>
-    </div>
-    <div class="dock-group grow">
-      <span class="dock-label">Quick</span>
-      <div class="quick" id="quick">
-        <button data-brief>Morning brief</button>
-        <button data-ask="Any important unread mail?">Unread mail</button>
-        <button data-ask="What meetings do I have today?">Today's meetings</button>
-        <button data-ask="Which CRM tasks are due today or overdue?">My CRM tasks</button>
-        <button data-ask="Give me a quick summary of my open deals and which close this month.">Deal pipeline</button>
-        <button data-ask="What is the status of my expense reports?">Expense reports</button>
-        <button data-ask="What is my leave balance?">Leave balance</button>
-        <button data-ask="Check me in for today.">Check in</button>
+    <ul class="systems" id="systems" aria-label="Connections"></ul>
+    <div class="top-actions">
+      <span class="clock" id="clock-time">--:--</span>
+      <div class="lang" role="group" aria-label="Language">
+        <button id="lang-en" class="seg" title="English">EN</button><button id="lang-ta" class="seg" title="தமிழ்">த</button>
       </div>
+      <button id="wake" class="icon-btn wake" aria-label="Wake word Jo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3zm-7 9h2a5 5 0 0 0 10 0h2a7 7 0 0 1-6 6.9V21h-2v-3.1A7 7 0 0 1 5 11z"/></svg></button>
+      <button id="mute" class="icon-btn" title="Speak replies aloud" aria-label="Toggle speech"></button>
+      <button id="fullscreen" class="icon-btn" aria-label="Full screen"></button>
+      <button id="open-settings" class="icon-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 3h-4l-.4 2.7a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7 7 0 0 0 1.7 1L11 21h4l.4-2.7a7 7 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg></button>
     </div>
+  </header>
+
+  <div class="main">
+    <aside class="today" id="today-panel" aria-label="Today">
+      <div class="today-date" id="clock-date">—</div>
+
+      <section class="block">
+        <h2><span>Meetings</span><button class="mini" id="refresh-agenda" title="Refresh" aria-label="Refresh meetings">↻</button></h2>
+        <ul class="list agenda" id="agenda"><li class="muted">Zoho Calendar not connected.</li></ul>
+      </section>
+
+      <section class="block">
+        <h2><span>My tasks</span><span class="count" id="hud-tasks"></span><button class="mini" id="refresh-tasks" title="Refresh" aria-label="Refresh tasks">↻</button></h2>
+        <form class="add-task" id="add-task">
+          <input id="task-title" placeholder="New CRM task" aria-label="New CRM task">
+          <input id="task-due" type="date" aria-label="Due date">
+          <button type="submit" aria-label="Add task">+</button>
+        </form>
+        <ul class="list tasks" id="tasks"></ul>
+      </section>
+
+      <section class="block">
+        <h2><span>Unread mail</span><span class="count" id="hud-mail"></span><span id="mail-count" hidden></span><button class="mini" id="refresh-mail" title="Check mail now" aria-label="Refresh mail">↻</button></h2>
+        <ul class="list mail" id="mail"><li class="muted">Zoho Mail not connected.</li></ul>
+      </section>
+
+      <section class="block">
+        <h2><span>Team</span><span class="count warn" id="team-count"></span><button class="mini" id="refresh-team" title="Refresh" aria-label="Refresh team tasks">↻</button></h2>
+        <ul class="list team" id="team"><li class="muted">Tasks you give your team show here.</li></ul>
+      </section>
+    </aside>
+
+    <section class="convo" id="convo-panel" aria-label="Conversation">
+      <div class="convo-head">
+        <span>Conversation</span>
+        <button class="mini" id="clear-convo" title="Start a new conversation">⟲ New</button>
+      </div>
+      <div class="brief-banner" id="brief-banner" hidden>
+        <span>Your morning brief is ready</span>
+        <button id="play-brief">▶ Play</button>
+        <button id="dismiss-brief" class="mini" aria-label="Dismiss">✕</button>
+      </div>
+      <div class="transcript" id="transcript" aria-live="polite"></div>
+      <div class="quick" id="quick" aria-label="Quick actions">
+        <button data-brief title="Morning brief"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1zM4 14a8 8 0 0 1 16 0zm-1 2h18v2H3z"/></svg>Brief</button>
+        <button data-ask="What's on my calendar today?" title="Today's meetings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v2h6V2h2v2h3v17H4V4h3zm-1 7v10h12V9z"/></svg>Meetings</button>
+        <button data-ask="Any important unread mail?" title="Unread mail"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zm2 2v.3l7 4.4 7-4.4V7zm14 2.7-7 4.3-7-4.3V17h14z"/></svg>Mail</button>
+        <button data-ask="Which of my CRM tasks are due today or overdue?" title="My CRM tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>Tasks</button>
+        <button data-ask="What tasks are pending with my team?" title="Team tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm8 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM2 19c0-3 3-5 6-5s6 2 6 5zm12.5 0c0-1.8-.7-3.3-1.9-4.4A7 7 0 0 1 16 14c3 0 6 2 6 5z"/></svg>Team</button>
+        <button data-ask="Summarise my open deals and which close this month." title="Deal pipeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V10h3v10zm6 0V4h3v16zm6 0v-7h3v7z"/></svg>Deals</button>
+        <button data-ask="What is the status of my expense reports?" title="Expense reports"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2zm3 5v2h6V7zm0 4v2h6v-2z"/></svg>Expenses</button>
+      </div>
+      <form class="ask" id="ask-form" autocomplete="off">
+        <input id="ask-input" placeholder="Ask Jo Office anything…" aria-label="Ask Jo Office">
+        <button type="submit" class="send" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21 23 12 2 3v7l15 2-15 2z"/></svg></button>
+      </form>
+    </section>
+  </div>
+
+  <footer class="wavebar idle" id="wavebar">
+    <span class="state" id="state">Standing by</span>
+    <button class="bars" id="reactor" aria-label="Talk to Jo Office (Space)"><canvas id="wave" aria-hidden="true"></canvas></button>
+    <span class="core" title="Gemini model · last reply time"><span id="hud-model">—</span> · <span id="hud-latency">—</span></span>
+    <button type="button" id="mic" class="mic" aria-label="Speak"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg></button>
   </footer>
-</main>
+</div>
 
 <!-- Settings drawer -->
 <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
@@ -603,6 +327,13 @@ button.dock-label:hover { color: var(--cyan); }
     <section>
       <h3>You</h3>
       <label>Your name<input data-setting="userName" placeholder="e.g. Karthik" autocomplete="name"></label>
+      <label>Theme
+        <select data-setting="theme" id="theme-select">
+          <option value="navy">Midnight navy</option>
+          <option value="graphite">Graphite teal</option>
+          <option value="light">Clean light</option>
+        </select>
+      </label>
     </section>
 
     <section>
@@ -652,7 +383,7 @@ button.dock-label:hover { color: var(--cyan); }
       <label>Bridge key (OFFICE_BRIDGE_KEY)<input type="password" data-setting="bridgeKey"></label>
       <label>Zoho grant code (api-console.zoho.com › Self Client › Generate code)<input id="zoho-code" spellcheck="false"></label>
       <p class="hint">Scope to paste when generating the code (all of it, one line):</p>
-      <textarea class="scopes" readonly rows="4" spellcheck="false">ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.ALL,ZohoCRM.modules.ALL,ZohoCRM.users.READ,ZohoCRM.coql.READ,ZohoExpense.fullaccess.ALL,ZOHOPEOPLE.forms.ALL,ZOHOPEOPLE.leave.ALL,ZOHOPEOPLE.attendance.ALL,ZOHOPEOPLE.employee.ALL</textarea>
+      <textarea class="scopes" readonly rows="4" spellcheck="false">ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.ALL,ZohoCRM.modules.ALL,ZohoCRM.users.READ,ZohoCRM.coql.READ,ZohoCRM.org.READ,ZohoExpense.fullaccess.ALL,ZohoCalendar.calendar.READ,ZohoCalendar.event.ALL</textarea>
       <div class="voice-row">
         <button class="test" data-test="zoho-connect">Connect Zoho</button>
         <button class="test" data-test="bridge">Test Zoho apps</button>
@@ -680,434 +411,124 @@ button.dock-label:hover { color: var(--cyan); }
 <div class="toast" id="toast" hidden></div>
 
 <script>
-/* jo-graph.js */
+/* jo-wave.js */
 /*
- * Jo background: an animated knowledge-graph network (colored clusters, hub fans,
- * links between clusters, signals travelling along edges). Drawn on #particles.
- * window.JoGraph.setActivity(mode) makes it busier while Jo listens, thinks or speaks.
+ * Jo Office voice wave bar: the row of bars along the bottom that shows what the AI is doing.
+ * standing by (soft ripple), listening (your microphone level), thinking (a sweeping pulse),
+ * speaking (Jo's voice: the real audio for the Gemini voice, a speech-like pattern for the PC
+ * voice). jo-ui.js drives it through window.JoViz.
  */
 (function () {
   "use strict";
-  const canvas = document.getElementById("particles");
+  const canvas = document.getElementById("wave");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const BAR = 3, GAP = 3;
 
-  const COLORS = ["#ff4d6d", "#ff9f43", "#4d7cff", "#3ee6ff", "#b98cff", "#ffd166", "#6ee7a8", "#ff7eb6"];
-  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  const COLOR_RGB = COLORS.map(rgb);
-  const PULSES_PER_SEC = { idle: 1.2, listening: 4, thinking: 9, speaking: 5, error: 2 };
+  let mode = "idle";
+  let speechAnalyser = null, speechData = null; // Jo's Gemini voice
+  let micAnalyser = null, micData = null, micCtx = null, micStream = null; // your voice
+  let bump = 0; // a little kick on each spoken word (PC voice)
+  let heights = [];
+  let colour = "#4CC9F0", colourAt = 0;
 
-  let w = 0, h = 0, dpr = 1;
-  let nodes = [], edges = [], clusters = [], pulses = [];
-  let activity = "idle", spawnDebt = 0, last = performance.now();
-  const mouse = { x: -1e4, y: -1e4 };
-  const rand = (a, b) => a + Math.random() * (b - a);
-
-  function build() {
-    nodes = []; edges = []; pulses = [];
-    const count = Math.max(200, Math.min(520, Math.round((w * h) / 2900)));
-    const k = Math.min(w, h);
-    // Cluster centres spread around the screen, a couple near the middle.
-    const nClusters = 9;
-    clusters = Array.from({ length: nClusters }, (_, i) => {
-      const a = (i / nClusters) * Math.PI * 2 + rand(-0.3, 0.3);
-      const r = i < 2 ? rand(0, 0.08) : rand(0.16, 0.34);
-      return {
-        bx: w / 2 + Math.cos(a) * r * w, by: h / 2 + Math.sin(a) * r * h * 1.05,
-        x: 0, y: 0, color: i % COLORS.length, phase: rand(0, 6.28),
-        fan: i === 5 || i === 6, // yellow / green "fans" like the reference image
-      };
-    });
-    clusters.forEach((c) => { c.x = c.bx; c.y = c.by; });
-
-    const sizes = clusters.map((c) => (c.fan ? 0.6 : rand(0.8, 1.4)));
-    const total = sizes.reduce((s, v) => s + v, 0);
-    clusters.forEach((c, ci) => {
-      const n = Math.max(12, Math.round((sizes[ci] / total) * count));
-      const start = nodes.length;
-      const spread = k * (c.fan ? 0.05 : 0.09);
-      for (let j = 0; j < n; j++) {
-        nodes.push({
-          x: c.x + rand(-spread, spread), y: c.y + rand(-spread, spread), vx: 0, vy: 0,
-          c: ci, hub: j === 0, r: j === 0 ? 3.4 : rand(1.2, 2.3), tw: rand(0, 6.28), deg: 0,
-        });
-        if (j > 0) {
-          // Fans: every leaf hangs off the hub. Others: tree-like links plus a few extra.
-          const parent = c.fan ? start : start + Math.floor(Math.random() * Math.min(j, 6 + j / 2));
-          edges.push([start + j, parent]);
-          if (!c.fan && Math.random() < 0.5) edges.push([start + j, start + Math.floor(Math.random() * j)]);
-        }
-      }
-      c.start = start; c.end = nodes.length;
-    });
-    // Links between clusters (the long coloured strands in the reference).
-    const bridges = Math.round(nodes.length * 0.16);
-    for (let i = 0; i < bridges; i++) {
-      const a = Math.floor(Math.random() * nodes.length);
-      let b = Math.floor(Math.random() * nodes.length);
-      if (nodes[a].c === nodes[b].c) b = clusters[(nodes[a].c + 1 + Math.floor(Math.random() * 3)) % clusters.length].start;
-      edges.push([a, b]);
-    }
-    // A couple of tendrils: thin chains leaving the graph.
-    for (let t = 0; t < 2; t++) {
-      const c = clusters[2 + t * 4];
-      let prev = c.start;
-      const dir = Math.atan2(c.by - h / 2, c.bx - w / 2) + rand(-0.5, 0.5);
-      for (let s = 1; s <= 9; s++) {
-        nodes.push({ x: c.x + Math.cos(dir) * s * 18, y: c.y + Math.sin(dir) * s * 18, vx: 0, vy: 0,
-          c: clusters.indexOf(c), hub: false, r: 1.2, tw: rand(0, 6.28), deg: 0, tendril: true });
-        edges.push([nodes.length - 1, prev]);
-        prev = nodes.length - 1;
-      }
-    }
-    edges.forEach(([a, b]) => { nodes[a].deg++; nodes[b].deg++; });
-    for (let i = 0; i < 260; i++) step(1, 0);
-  }
-
-  // Force-directed layout: springs on edges, repulsion between nearby nodes, weak pull home.
-  function step(strength, time) {
-    const cell = 60, grid = new Map();
-    clusters.forEach((c) => {
-      c.x = c.bx + Math.sin(time * 0.00011 + c.phase) * 18;
-      c.y = c.by + Math.cos(time * 0.00009 + c.phase) * 14;
-    });
-    nodes.forEach((n, i) => {
-      const key = ((n.x / cell) | 0) + "," + ((n.y / cell) | 0);
-      (grid.get(key) || grid.set(key, []).get(key)).push(i);
-    });
-    nodes.forEach((n, i) => {
-      const gx = (n.x / cell) | 0, gy = (n.y / cell) | 0;
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-        const list = grid.get(gx + dx + "," + (gy + dy));
-        if (!list) continue;
-        for (const j of list) {
-          if (j <= i) continue;
-          const m = nodes[j];
-          let ex = n.x - m.x, ey = n.y - m.y, d2 = ex * ex + ey * ey;
-          if (d2 > cell * cell || d2 === 0) continue;
-          const f = (160 / d2) * strength;
-          ex *= f; ey *= f;
-          n.vx += ex; n.vy += ey; m.vx -= ex; m.vy -= ey;
-        }
-      }
-    });
-    for (const [a, b] of edges) {
-      const n = nodes[a], m = nodes[b];
-      const rest = n.tendril || m.tendril ? 18 : nodes[a].c === nodes[b].c ? 20 : 110;
-      const ex = m.x - n.x, ey = m.y - n.y, d = Math.hypot(ex, ey) || 1;
-      const f = ((d - rest) / d) * (nodes[a].c === nodes[b].c ? 0.02 : 0.002) * strength;
-      n.vx += ex * f; n.vy += ey * f; m.vx -= ex * f; m.vy -= ey * f;
-    }
-    for (const n of nodes) {
-      const c = clusters[n.c];
-      n.vx += (c.x - n.x) * 0.0012 * strength;
-      n.vy += (c.y - n.y) * 0.0012 * strength;
-      // The cursor gently parts the graph.
-      const mx = n.x - mouse.x, my = n.y - mouse.y, md2 = mx * mx + my * my;
-      if (md2 < 120 * 120) { const f = 0.6 / Math.max(md2, 400); n.vx += mx * f * 40; n.vy += my * f * 40; }
-      n.vx *= 0.82; n.vy *= 0.82;
-      n.x += n.vx; n.y += n.vy;
-    }
-  }
-
-  function spawnPulse() {
-    const e = edges[Math.floor(Math.random() * edges.length)];
-    const forward = Math.random() < 0.5;
-    pulses.push({ a: forward ? e[0] : e[1], b: forward ? e[1] : e[0], t: 0, speed: rand(0.5, 1.1) });
-  }
-
-  function draw(time) {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    const near = (n) => { const dx = n.x - mouse.x, dy = n.y - mouse.y; return dx * dx + dy * dy < 140 * 140; };
-
-    ctx.lineWidth = 0.7;
-    for (const [a, b] of edges) {
-      const n = nodes[a], m = nodes[b], col = COLOR_RGB[clusters[n.c].color];
-      const lit = near(n) || near(m);
-      ctx.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},${lit ? 0.55 : n.c === m.c ? 0.2 : 0.11})`;
-      ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(m.x, m.y); ctx.stroke();
-    }
-    for (const n of nodes) {
-      const col = COLOR_RGB[clusters[n.c].color];
-      const twinkle = 0.55 + 0.45 * Math.sin(time * 0.0016 + n.tw);
-      const lit = near(n);
-      const r = n.r + (lit ? 1 : 0) + Math.min(n.deg, 12) * 0.06;
-      if (n.hub || lit) {
-        ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},0.12)`;
-        ctx.beginPath(); ctx.arc(n.x, n.y, r * 3.2, 0, 6.283); ctx.fill();
-      }
-      ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${lit ? 1 : 0.45 + 0.4 * twinkle})`;
-      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 6.283); ctx.fill();
-    }
-    ctx.globalCompositeOperation = "lighter";
-    for (const p of pulses) {
-      const n = nodes[p.a], m = nodes[p.b], col = COLOR_RGB[clusters[n.c].color];
-      const x = n.x + (m.x - n.x) * p.t, y = n.y + (m.y - n.y) * p.t;
-      const fade = Math.sin(p.t * Math.PI);
-      ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${0.25 * fade})`;
-      ctx.beginPath(); ctx.arc(x, y, 6, 0, 6.283); ctx.fill();
-      ctx.fillStyle = `rgba(255,255,255,${0.85 * fade})`;
-      ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 6.283); ctx.fill();
-    }
-    ctx.globalCompositeOperation = "source-over";
-  }
-
-  function frame(time) {
-    const dt = Math.min(0.05, (time - last) / 1000); last = time;
-    step(0.35, time);
-    spawnDebt += (PULSES_PER_SEC[activity] || 1) * dt;
-    while (spawnDebt >= 1) { spawnPulse(); spawnDebt -= 1; }
-    for (const p of pulses) {
-      const n = nodes[p.a], m = nodes[p.b];
-      p.t += (p.speed * 90 * dt) / (Math.hypot(m.x - n.x, m.y - n.y) || 1);
-    }
-    pulses = pulses.filter((p) => p.t < 1);
-    draw(time);
-    requestAnimationFrame(frame);
-  }
-
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    w = innerWidth; h = innerHeight;
-    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
-    canvas.style.width = w + "px"; canvas.style.height = h + "px";
-    build();
-    if (reduced) draw(0);
-  }
-
-  let resizeTimer;
-  addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 200); });
-  addEventListener("pointermove", (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
-  document.addEventListener("pointerleave", () => { mouse.x = mouse.y = -1e4; });
-  resize();
-  if (!reduced) requestAnimationFrame(frame);
-
-  window.JoGraph = { setActivity(mode) { activity = mode in PULSES_PER_SEC ? mode : "idle"; } };
-})();
-
-</script>
-<script>
-/* jo-viz.js */
-/*
- * Jo's voice visualizer: the spectrum ring around the core, the waveform under it, live captions
- * of what Jo is saying and the key-figure readouts. jo-ui.js drives it through window.JoViz:
- *   setMode(mode)            idle | listening | thinking | speaking | error
- *   say(text, lang, figures) show captions and figures for a reply about to be spoken
- *   wordAt(charIndex)        exact position from the voice engine (PC voices report it)
- *   setAnalyser(node)        a Web Audio AnalyserNode for the Gemini voice (real levels)
- */
-(function () {
-  "use strict";
-  const $ = (id) => document.getElementById(id);
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const ns = "http://www.w3.org/2000/svg";
-
-  let mode = "idle", analyser = null, freq = null, wave = null;
-  let words = [], spokenFrom = 0, wordsPerSec = 2.6, exactIndex = -1, lastShown = -1;
-  let level = 0; // smoothed 0..1 loudness
-
-  // ---------- spectrum ring around the core ----------
-  const bars = [];
-  const barGroup = $("bars");
-  if (barGroup) {
-    for (let i = 0; i < 72; i++) {
-      const l = document.createElementNS(ns, "line");
-      l.dataset.a = String((i / 72) * Math.PI * 2 - Math.PI / 2);
-      barGroup.appendChild(l);
-      bars.push(l);
-    }
-  }
-
-  // ---------- waveform under the core ----------
-  const canvas = $("wave");
-  const ctx = canvas ? canvas.getContext("2d") : null;
-  function sizeCanvas() {
-    if (!canvas) return;
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    canvas.width = Math.round(canvas.clientWidth * dpr);
-    canvas.height = Math.round(canvas.clientHeight * dpr);
+  function size() {
+    const r = canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(r.width * dpr));
+    canvas.height = Math.max(1, Math.round(r.height * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  addEventListener("resize", sizeCanvas);
+  addEventListener("resize", size);
+  size();
 
-  // Loudness: the real signal for the Gemini voice; for phone/PC voices (which can't be measured)
-  // a speech-like rhythm of syllables.
-  function measure(t) {
-    if (analyser && mode === "speaking") {
-      analyser.getByteTimeDomainData(wave);
-      let sum = 0;
-      for (let i = 0; i < wave.length; i++) { const v = (wave[i] - 128) / 128; sum += v * v; }
-      const rms = Math.sqrt(sum / wave.length);
-      if (rms > 0.004) return Math.min(1, rms * 7);
-    }
-    if (mode === "speaking") {
-      const syllable = Math.abs(Math.sin(t / 95)) * (0.55 + 0.45 * Math.sin(t / 410));
-      const phrase = 0.65 + 0.35 * Math.sin(t / 1300);
-      return Math.max(0.12, syllable * phrase);
-    }
-    if (mode === "listening") return 0.28 + 0.12 * Math.sin(t / 260);
-    if (mode === "thinking") return 0.16 + 0.06 * Math.sin(t / 120);
-    return 0.05;
+  /** Average loudness 0..1 in the voice band of an analyser. */
+  function level(analyser, data) {
+    if (!analyser) return 0;
+    analyser.getByteFrequencyData(data);
+    let sum = 0;
+    const n = Math.min(data.length, 64);
+    for (let i = 2; i < n; i++) sum += data[i];
+    return Math.min(1, sum / ((n - 2) * 160));
   }
 
-  function drawBars(t) {
-    const useFreq = analyser && mode === "speaking";
-    if (useFreq) analyser.getByteFrequencyData(freq);
-    const k = { speaking: 1, listening: 0.6, thinking: 0.45, error: 0.3 }[mode] || 0.18;
-    bars.forEach((l, i) => {
-      const a = +l.dataset.a;
-      let v;
-      if (useFreq) {
-        // mirror the lower spectrum around the ring
-        const idx = Math.floor((i < 36 ? i : 71 - i) * (freq.length * 0.45) / 36);
-        v = freq[idx] / 255;
+  function targets(count, t) {
+    const out = new Array(count);
+    const mid = (count - 1) / 2;
+    for (let i = 0; i < count; i++) {
+      const env = 1 - Math.abs(i - mid) / (mid + 1); // taller in the middle
+      let h;
+      if (mode === "listening") {
+        const lv = micAnalyser ? level(micAnalyser, micData) : 0.25 + 0.15 * Math.sin(t / 300);
+        h = 0.08 + lv * env * (0.55 + 0.45 * Math.abs(Math.sin(t / 90 + i * 0.9)));
+      } else if (mode === "thinking") {
+        const pos = ((t / 18) % (count + 16)) - 8;
+        h = 0.06 + 0.5 * Math.max(0, 1 - Math.abs(i - pos) / 6);
+      } else if (mode === "speaking") {
+        let lv = speechAnalyser ? level(speechAnalyser, speechData) : 0;
+        if (lv < 0.02) lv = 0.35 + 0.25 * Math.abs(Math.sin(t / 140)) + bump; // PC voice: no audio to measure
+        h = 0.08 + Math.min(1, lv) * env * (0.5 + 0.5 * Math.abs(Math.sin(t / 70 + i * 1.3)));
+      } else if (mode === "error") {
+        h = 0.05;
       } else {
-        v = ((Math.sin(t / 170 + i * 0.6) + Math.sin(t / 83 + i * 1.7) + 2) / 4) * level * 1.6;
+        h = 0.05 + 0.04 * (1 + Math.sin(t / 700 + i / 3)); // standing by: a slow ripple
       }
-      const len = 3 + Math.min(1, v) * 30 * k + level * 6;
-      const r1 = 104, r2 = r1 + len;
-      l.setAttribute("x1", (200 + Math.cos(a) * r1).toFixed(1)); l.setAttribute("y1", (200 + Math.sin(a) * r1).toFixed(1));
-      l.setAttribute("x2", (200 + Math.cos(a) * r2).toFixed(1)); l.setAttribute("y2", (200 + Math.sin(a) * r2).toFixed(1));
-    });
+      out[i] = Math.min(1, h);
+    }
+    bump *= 0.85;
+    return out;
   }
 
-  function drawWave(t) {
-    if (!ctx) return;
+  function draw(t) {
+    requestAnimationFrame(draw);
+    if (document.hidden) return;
+    if (reduced && mode === "idle" && heights.length) return;
+    if (t - colourAt > 1000) { colour = getComputedStyle(canvas).getPropertyValue("--acc").trim() || colour; colourAt = t; }
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (!w || !h) return;
-    if (canvas.width < w) sizeCanvas();
+    const count = Math.max(8, Math.floor((w + GAP) / (BAR + GAP)));
+    const want = targets(count, t);
+    if (heights.length !== count) heights = want.slice();
     ctx.clearRect(0, 0, w, h);
-    const color = mode === "thinking" ? "255,181,71" : mode === "error" ? "255,92,122" : "62,230,255";
-    const layers = [[1, 0.9, 2], [0.6, 0.45, 1.2], [0.35, 0.25, 1]];
-    layers.forEach(([amp, alpha, width], li) => {
+    ctx.fillStyle = colour;
+    ctx.globalAlpha = mode === "idle" ? 0.45 : 0.95;
+    const left = (w - (count * (BAR + GAP) - GAP)) / 2;
+    for (let i = 0; i < count; i++) {
+      heights[i] += (want[i] - heights[i]) * (want[i] > heights[i] ? 0.55 : 0.25); // quick rise, gentle fall
+      const bh = Math.max(3, heights[i] * h);
+      const x = left + i * (BAR + GAP), y = (h - bh) / 2;
       ctx.beginPath();
-      for (let x = 0; x <= w; x += 3) {
-        const p = x / w;
-        const envelope = Math.sin(p * Math.PI) ** 1.6; // quiet at the edges
-        const y = h / 2 + Math.sin(p * (14 + li * 5) + t / (180 - li * 40)) * Math.sin(p * 5 - t / 600)
-          * envelope * amp * (h * 0.46) * (0.08 + level);
-        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = `rgba(${color},${alpha})`;
-      ctx.lineWidth = width;
-      ctx.shadowColor = `rgba(${color},0.8)`;
-      ctx.shadowBlur = li === 0 ? 8 : 0;
-      ctx.stroke();
-    });
-    ctx.shadowBlur = 0;
+      if (ctx.roundRect) ctx.roundRect(x, y, BAR, bh, 1.5); else ctx.rect(x, y, BAR, bh);
+      ctx.fill();
+    }
   }
-
-  // ---------- captions ----------
-  const caption = $("caption");
-  function renderCaption(text, lang) {
-    if (!caption) return;
-    caption.classList.toggle("ta", lang === "ta");
-    caption.innerHTML = "";
-    words = [];
-    let pos = 0;
-    String(text).split(/(\s+)/).forEach((part) => {
-      if (/^\s+$/.test(part) || !part) { caption.appendChild(document.createTextNode(part)); pos += part.length; return; }
-      const span = document.createElement("span");
-      span.textContent = part;
-      caption.appendChild(span);
-      words.push({ span, start: pos });
-      pos += part.length;
-    });
-    lastShown = -1; exactIndex = -1;
-    caption.classList.add("show");
-  }
-  function updateCaption(t) {
-    if (!words.length || mode !== "speaking") return;
-    let n = exactIndex >= 0 ? exactIndex : Math.floor(((t - spokenFrom) / 1000) * wordsPerSec);
-    n = Math.min(words.length - 1, Math.max(0, n));
-    if (n === lastShown) return;
-    for (let i = Math.max(0, lastShown); i <= n; i++) words[i].span.className = i === n ? "now" : "said";
-    lastShown = n;
-    const span = words[n].span;
-    caption.scrollTop = Math.max(0, span.offsetTop - caption.clientHeight / 2);
-  }
-  function finishCaption() {
-    words.forEach((w) => { w.span.className = "said"; });
-    clearTimeout(finishCaption.timer);
-    finishCaption.timer = setTimeout(() => caption && caption.classList.remove("show"), 7000);
-  }
-
-  // ---------- key figures ----------
-  const figuresEl = $("figures");
-  function renderFigures(list) {
-    if (!figuresEl) return;
-    figuresEl.innerHTML = "";
-    (list || []).forEach((f, i) => {
-      const card = document.createElement("div");
-      card.className = "figure";
-      card.style.animationDelay = `${0.15 + i * 0.18}s`;
-      card.innerHTML = '<div class="fig-value"></div><div class="fig-label"></div>';
-      card.querySelector(".fig-label").textContent = f.label;
-      const valueEl = card.querySelector(".fig-value");
-      figuresEl.appendChild(card);
-      countUp(valueEl, f.value, 0.15 + i * 0.18);
-    });
-  }
-  // Counts the number up from zero, keeping its ₹ sign, commas and units.
-  function countUp(el, value, delay) {
-    const m = /^(\D*)([\d,]+(?:\.\d+)?)(.*)$/.exec(value);
-    if (!m || reduced) { el.textContent = value; return; }
-    const [, pre, num, post] = m;
-    const target = parseFloat(num.replace(/,/g, ""));
-    const decimals = (num.split(".")[1] || "").length;
-    const commas = num.includes(",");
-    const start = performance.now() + delay * 1000, dur = 900;
-    const fmt = (v) => {
-      const s = v.toFixed(decimals);
-      return commas ? Number(s).toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : s;
-    };
-    el.textContent = pre + fmt(0) + post;
-    const step = (now) => {
-      const p = Math.min(1, Math.max(0, (now - start) / dur));
-      el.textContent = pre + fmt(target * (1 - (1 - p) ** 3)) + post;
-      if (p < 1) requestAnimationFrame(step); else el.textContent = value;
-    };
-    requestAnimationFrame(step);
-  }
-
-  // ---------- loop ----------
-  const stage = $("stage");
-  function frame(t) {
-    level += (measure(t) - level) * 0.25;
-    drawBars(t);
-    drawWave(t);
-    updateCaption(t);
-    if (stage) stage.style.setProperty("--level", level.toFixed(3));
-    requestAnimationFrame(frame);
-  }
-  sizeCanvas();
-  if (reduced) { drawBars(0); drawWave(0); } else requestAnimationFrame(frame);
+  requestAnimationFrame(draw);
 
   window.JoViz = {
     setMode(m) {
-      const was = mode;
       mode = m;
-      if (m === "speaking" && was !== "speaking") spokenFrom = performance.now();
-      if (was === "speaking" && m !== "speaking") finishCaption();
-      if (reduced) { drawBars(0); drawWave(0); }
+      const bar = document.getElementById("wavebar");
+      if (bar) bar.className = `wavebar ${m}`;
     },
-    say(text, lang, figures) {
-      wordsPerSec = lang === "ta" ? 1.8 : 2.6;
-      renderCaption(text, lang);
-      renderFigures(figures);
+    /** Jo's Gemini voice plays through this analyser. */
+    setAnalyser(a) { speechAnalyser = a; speechData = a ? new Uint8Array(a.frequencyBinCount) : null; },
+    /** Your microphone, while Jo listens (the stream is shared with the recording for Gemini). */
+    setMic(stream) {
+      if (stream === micStream) return;
+      micStream = stream;
+      micAnalyser = null;
+      if (!stream) return;
+      try {
+        micCtx = micCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (micCtx.state === "suspended") micCtx.resume().catch(() => {});
+        micAnalyser = micCtx.createAnalyser();
+        micAnalyser.fftSize = 256;
+        micData = new Uint8Array(micAnalyser.frequencyBinCount);
+        micCtx.createMediaStreamSource(stream).connect(micAnalyser);
+      } catch { micAnalyser = null; }
     },
-    wordAt(charIndex) {
-      let i = words.findIndex((w) => w.start > charIndex);
-      exactIndex = Math.max(0, (i < 0 ? words.length : i) - 1);
-    },
-    setAnalyser(node) {
-      analyser = node;
-      freq = new Uint8Array(node.frequencyBinCount);
-      wave = new Uint8Array(node.fftSize);
-    },
-    clear() { if (caption) caption.classList.remove("show"); renderFigures([]); },
+    wordAt() { bump = 0.35; },
+    say() {}, // the reply is in the conversation; nothing extra to show here
+    clear() {},
   };
 })();
 
@@ -1274,7 +695,7 @@ button.dock-label:hover { color: var(--cyan); }
     async transcribe(audioBase64, mimeType, { hints = [], tamil = false, heard = "", learned = [] } = {}) {
       const prompt = [
         `Write down exactly what the speaker says in this recording${tamil ? ", in Tamil script (keep English words and names in English)" : ", in English"}.`,
-        "The speaker is in Tamil Nadu, India, talking to their work assistant about mail, customers, CRM, expenses or leave.",
+        "The speaker is in Tamil Nadu, India, talking to their work assistant about mail, customers, CRM, expenses or meetings.",
         hints.length ? `Names and words they often use; when a word sounds like one of these, use this spelling: ${hints.join(", ")}.` : "",
         learned.length ? `This speaker has corrected these before (was written → what they meant): ${learned.slice(-60).map((x) => `"${x.heard}" → "${x.meant}"`).join("; ")}.` : "",
         heard ? `A rough automatic transcript, which may have mistakes: "${heard}"` : "",
@@ -1468,7 +889,7 @@ button.dock-label:hover { color: var(--cyan); }
   // Zoho answers take 1.5 to 6 seconds, so read results are kept for a short while: the panels,
   // the brief and your questions share them, and two identical requests at once make one call.
   // Any change (a mail sent, a record updated) clears everything, so nothing stale is shown.
-  const CHANGE_ACTIONS = /^(mail_send|crm_create|crm_update|crm_add_note|expense_create|people_apply_leave|people_attendance|zoho_connect)$/;
+  const CHANGE_ACTIONS = /^(mail_send|crm_create|crm_update|crm_add_note|expense_create|calendar_add|zoho_connect)$/;
   class Bridge {
     constructor(url, key, http = defaultHttp) { Object.assign(this, { url: url.trim(), key: key.trim(), http, cache: new Map() }); }
 
@@ -1513,8 +934,18 @@ button.dock-label:hover { color: var(--cyan); }
     const d = new Date(ms), off = -d.getTimezoneOffset(), a = Math.abs(off);
     return `${isoDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${off >= 0 ? "+" : "-"}${pad(Math.floor(a / 60))}:${pad(a % 60)}`;
   }
-  /** Zoho People attendance time: 21/10/2026 09:30:00. */
-  const peopleTime = (d = new Date()) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  /** Zoho Calendar time: 20261024T150000+0530 (local time with its offset). */
+  function calTime(ms) {
+    const d = new Date(ms), off = -d.getTimezoneOffset(), a = Math.abs(off);
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00${off >= 0 ? "+" : "-"}${pad(Math.floor(a / 60))}${pad(a % 60)}`;
+  }
+  const rupees = (n) => `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
+  // Zoho CRM tab names in record links (Deals are "Potentials" there).
+  const CRM_TABS = { Deals: "Potentials", Leads: "Leads", Contacts: "Contacts", Accounts: "Accounts", Tasks: "Tasks", Events: "Events", Calls: "Calls" };
+  const crmLink = (base, module, id) => (base && id ? `${base}/${CRM_TABS[module] || module}/${id}` : "");
+  /** A record's display name, whichever module it comes from. */
+  const recordName = (r) => r.Deal_Name || r.Full_Name || [r.First_Name, r.Last_Name].filter(Boolean).join(" ") || r.Subject || r.Event_Title
+    || (typeof r.Account_Name === "string" ? r.Account_Name : r.Account_Name?.name) || r.Company || r.name || "(no name)";
   const dateOnly = (text) => {
     const m = /^\d{4}-\d{2}-\d{2}/.exec(String(text || "").trim());
     if (!m) throw new Error(`Bad date "${text}"; use YYYY-MM-DD`);
@@ -1570,7 +1001,7 @@ button.dock-label:hover { color: var(--cyan); }
     fn("crm_query", "Read Zoho CRM with a COQL select query, e.g. select Deal_Name, Amount, Stage from Deals where Closing_Date between '2026-10-01' and '2026-10-31' limit 50. A where clause is required. Read-only.",
       { query: ["string", "One COQL select statement"] }, ["query"]),
     fn("crm_my_tasks", "The user's open Zoho CRM tasks with due dates."),
-    fn("crm_meetings", "Zoho CRM meetings (Events) from the start of today for the given number of days.", { days: ["integer", "1 = today, 7 = this week. Default 1"] }),
+    fn("crm_meetings", "Meetings logged in Zoho CRM (Events, linked to customers) from today for the given days. For the user's own schedule use calendar_events.", { days: ["integer", "1 = today, 7 = this week. Default 1"] }),
     fn("crm_pipeline", "The user's open Zoho CRM deals with stage, amount and closing date."),
     fn("crm_create_lead", "Create a lead in Zoho CRM. Needs the user's confirmation.", {
       last_name: ["string", "Last name (required by Zoho)"], first_name: ["string", "First name"], company: ["string", "Company"],
@@ -1606,23 +1037,20 @@ button.dock-label:hover { color: var(--cyan); }
       merchant: ["string", "Optional shop or vendor"], description: ["string", "What it was for"], reimbursable: ["boolean", "Default true"],
     }, ["amount", "category"]),
 
-    // Zoho People
-    fn("people_profile", "The user's Zoho People employee profile: ID, designation, department, manager."),
-    fn("leave_balance", "Leave types with the user's available and used balance in Zoho People."),
-    fn("holidays", "Company holidays from Zoho People for the next given days.", { days: ["integer", "Default 30"] }),
-    fn("apply_leave", "Apply for leave in Zoho People. Needs the user's confirmation.", {
-      leave_type: ["string", "Leave type name from leave_balance, e.g. Casual Leave"], from: ["string", "YYYY-MM-DD"],
-      to: ["string", "YYYY-MM-DD; same as from for one day"], reason: ["string", "Reason"],
-    }, ["leave_type", "from"]),
-    fn("check_in", "Check in now in Zoho People attendance. Needs the user's confirmation."),
-    fn("check_out", "Check out now in Zoho People attendance. Needs the user's confirmation."),
+    // Zoho Calendar
+    fn("calendar_events", "The user's Zoho Calendar: meetings and appointments from a day (default today) for the given number of days. Use for their schedule and for 'am I free'.",
+      { days: ["integer", "1 = that day only, 7 = a week. Default 1"], from: ["string", "Optional first day YYYY-MM-DD; default today"] }),
+    fn("calendar_add_event", "Add a meeting or appointment to the user's Zoho Calendar. Needs the user's confirmation.", {
+      title: ["string", "What it is"], start: ["string", "Local start YYYY-MM-DD HH:mm"], end: ["string", "Local end YYYY-MM-DD HH:mm; default one hour after start"],
+      location: ["string", "Optional place"], description: ["string", "Optional notes"],
+    }, ["title", "start"]),
   ];
 
   // Changes are never made straight away: Jo Office reads them back and waits for "yes".
   const READ_MAX_AGE = 2 * 60000; // answers may use Zoho data up to two minutes old
   const MAIL_FETCH = 30, AGENDA_DAYS = 7;
   const WRITE_TOOLS = new Set(["send_email", "reply_email", "save_draft", "crm_create_lead", "crm_add_note", "crm_create_task", "crm_create_meeting",
-    "crm_update_record", "crm_complete_task", "add_expense", "apply_leave", "check_in", "check_out"]);
+    "crm_update_record", "crm_complete_task", "add_expense", "calendar_add_event"]);
   // A reply confirms or cancels only when it is nothing but that: "yes, but make it Friday" and
   // "no, the name is Ravi Kumar" are corrections, which go back to Gemini to propose again.
   const YES_WORDS = ["yes", "yeah", "yep", "yup", "sure", "ok", "okay", "okey", "alright", "all right", "confirm", "confirmed",
@@ -1649,6 +1077,7 @@ button.dock-label:hover { color: var(--cyan); }
     constructor({ bridge = null, search = null, memory = null, markRead = true }) {
       Object.assign(this, { bridge, search, memory, markRead }); // markRead: emails read out are marked read in Zoho Mail
       this.pending = null; // { name, args, summary } waiting for the user's yes
+      this.sources = []; // cards for the chat: the records behind this answer
     }
     get functions() { return FUNCTIONS; }
 
@@ -1701,12 +1130,11 @@ button.dock-label:hover { color: var(--cyan); }
       if (!this.bridge) return;
       const age = 60000; // refresh only what is over a minute old (the panels load some of it already)
       await Promise.all([
-        this.read("mail_unread", { limit: MAIL_FETCH }, age), this.read("crm_my_tasks", {}, age), this.read("crm_agenda", this.agendaRange(), age),
-        this.read("crm_pipeline", {}, age), this.read("expense_reports", {}, age), this.read("crm_team_tasks", {}, age), this.read("people_holidays", this.holidayRange(14), 3600000),
+        this.read("mail_unread", { limit: MAIL_FETCH }, age), this.read("crm_my_tasks", {}, age), this.read("calendar_events", this.agendaRange(), age),
+        this.read("crm_pipeline", {}, age), this.read("expense_reports", {}, age), this.read("crm_team_tasks", {}, age)
       ].map((p) => p.catch(() => {})));
     }
     agendaRange(days = AGENDA_DAYS) { const from = startOfToday(); return { from, to: from + days * 86400000 }; }
-    holidayRange(days) { return { from: isoDate(), to: isoDate(new Date(Date.now() + days * 86400000)) }; }
 
     async call(name, args = {}) {
       try {
@@ -1719,7 +1147,11 @@ button.dock-label:hover { color: var(--cyan); }
             return this.memory.add(args.heard, args.meant)
               ? `Saved: from now on "${args.heard}" will be understood as "${args.meant}". Carry on with the corrected request.`
               : "Nothing to save (the two are the same or too long).";
-          case "get_unread_mail": return await this.unreadMail(args.limit || 10);
+          case "get_unread_mail": {
+            const mails = (await this.mail()).slice(0, args.limit || 10);
+            this.sources.push({ kind: "mail", title: "Unread mail", rows: mails });
+            return mails.length ? mails.map(describeMail).join("\n") : "No unread mail.";
+          }
           case "search_mail": {
             const { mails } = await z().call("mail_search", { query: args.query, limit: args.limit || 8 });
             return mails.length ? mails.map(describeMail).join("\n") : "No matching emails.";
@@ -1729,35 +1161,51 @@ button.dock-label:hover { color: var(--cyan); }
             return clip(stripHtml(content), 5000);
           }
           case "crm_search": {
-            const { records } = await z().call("crm_search", { module: args.module, word: args.word, limit: args.limit || 10 });
+            const { records, crmUrl } = await z().call("crm_search", { module: args.module, word: args.word, limit: args.limit || 10 });
+            this.crmCard(args.module, records, crmUrl, [`"${args.word}" in ${args.module}`], args.limit || 10);
             return records.length ? json(records) : "No matching CRM records.";
           }
           case "crm_get_record": return json((await z().call("crm_get", { module: args.module, id: args.record_id })).record, 8000);
           case "crm_query": {
-            const { records } = await z().call("crm_query", { query: args.query });
-            return records.length ? json(records, 10000) : "No records match.";
+            const { records, crmUrl } = await z().call("crm_query", { query: args.query });
+            const q = String(args.query || "");
+            const module = (/\bfrom\s+(\w+)/i.exec(q) || [])[1] || "";
+            const where = (/\bwhere\s+([\s\S]*?)(?:\s+order\s+by|\s+limit|$)/i.exec(q) || [])[1];
+            const card = this.crmCard(module, records, crmUrl, [`${module || "Records"} where ${where || "(all)"}`], Number((/\blimit\s+(\d+)/i.exec(q) || [])[1]) || 200);
+            return records.length ? json(records, 10000) + this.computed(card) : "No records match.";
           }
-          case "crm_my_tasks": return await this.listTasks();
+          case "crm_my_tasks": {
+            const text = await this.listTasks();
+            const list = await this.tasks();
+            const today = startOfToday();
+            this.sources.push({ kind: "crm", title: "Your open CRM tasks", filters: ["Tasks owned by you", "Not completed"], at: this.lastAt,
+              rows: list.map((t) => ({ name: t.title, date: t.date, note: t.priority, overdue: !!t.due && t.due < today, link: crmLink(this.lastCrmUrl, "Tasks", t.id) })),
+              count: `${list.length} open, ${list.filter((t) => t.due && t.due < today).length} overdue`, limited: list.length >= 50, all: this.lastCrmUrl ? `${this.lastCrmUrl}/Tasks` : "" });
+            return text;
+          }
           case "team_members": {
             const team = await this.team();
             return team.length ? team.map((u) => `- ${u.name}${u.role ? ` (${u.role})` : ""}, ${u.email}`).join("\n") : "No other CRM users found.";
           }
-          case "team_tasks": return await this.listTeamTasks(args.person);
+          case "team_tasks": {
+            const text = await this.listTeamTasks(args.person);
+            const list = await this.teamTasks(args.person);
+            this.sources.push({ kind: "crm", title: args.person ? `Open tasks: ${list[0]?.owner || args.person}` : "Tasks you gave the team", at: this.lastAt,
+              filters: [args.person ? `Owned by ${list[0]?.owner || args.person}` : "Created by you, owned by others", "Not completed"],
+              rows: list.map((t) => ({ name: t.owner ? `${t.owner}: ${t.title}` : t.title, date: t.date, note: t.priority, overdue: t.overdue, link: crmLink(this.lastCrmUrl, "Tasks", t.id) })),
+              count: `${list.length} open, ${list.filter((t) => t.overdue).length} overdue`, limited: list.length >= 100 });
+            return text;
+          }
           case "crm_meetings": return await this.listEvents(Math.min(Math.max(args.days || 1, 1), 31));
+          case "calendar_events": return await this.listCalendar(Math.min(Math.max(Number(args.days) || 1, 1), 31), args.from);
           case "crm_pipeline": {
-            const { deals } = await this.read("crm_pipeline");
-            return deals.length ? json(deals, 8000) : "No open deals.";
+            const { deals, crmUrl } = await this.read("crm_pipeline");
+            const card = this.crmCard("Deals", deals, crmUrl, ["Deals owned by you", "Not closed won or lost"], 50, "Your open deals");
+            return deals.length ? json(deals, 8000) + this.computed(card) : "No open deals.";
           }
           case "expense_list": return json((await this.read("expense_list", { limit: args.limit || 20 })).expenses);
           case "expense_reports": return json((await this.read("expense_reports")).reports);
           case "expense_categories": return (await this.read("expense_categories", {}, 3600000)).categories.map((c) => c.name).join(", ");
-          case "people_profile": return json((await this.read("people_profile", {}, 3600000)).profile);
-          case "leave_balance": return json((await this.read("people_leave_balance")).leaveTypes);
-          case "holidays": {
-            const days = Number(args.days) || 30;
-            const { holidays } = await this.read("people_holidays", this.holidayRange(days), 3600000);
-            return holidays.length ? json(holidays) : "No holidays in that period.";
-          }
           default: return `Unknown function ${name}`;
         }
       } catch (e) {
@@ -1794,9 +1242,10 @@ button.dock-label:hover { color: var(--cyan); }
         }
         case "crm_complete_task": return `Mark the CRM task ${a.subject ? `"${a.subject}" ` : ""}as completed.`;
         case "add_expense": return `Add an expense of ${money(a.amount)} for ${a.category}${a.merchant ? ` at ${a.merchant}` : ""} on ${a.date ? dateOnly(a.date) : "today"}${a.description ? `: ${a.description}` : ""}.`;
-        case "apply_leave": return `Apply for ${a.leave_type} from ${dateOnly(a.from)} to ${dateOnly(a.to || a.from)}${a.reason ? `, reason: ${a.reason}` : ""}.`;
-        case "check_in": return "Check you in now in Zoho People.";
-        case "check_out": return "Check you out now in Zoho People.";
+        case "calendar_add_event": {
+          const start = parseLocal(a.start);
+          return `Add "${a.title}" to your Zoho Calendar on ${formatTime(start)}${a.location ? ` at ${a.location}` : ""}.`;
+        }
         default: return name;
       }
     }
@@ -1855,13 +1304,13 @@ button.dock-label:hover { color: var(--cyan); }
           });
           return `Expense of ${money(a.amount)} added under ${r.category || a.category}.`;
         }
-        case "apply_leave": {
-          const r = await z.call("people_apply_leave", { leaveType: a.leave_type, from: dateOnly(a.from), to: dateOnly(a.to || a.from), reason: a.reason || "" });
-          return `${r.leaveType || a.leave_type} applied for ${dateOnly(a.from)}${a.to && a.to !== a.from ? ` to ${dateOnly(a.to)}` : ""}.`;
+        case "calendar_add_event": {
+          const start = parseLocal(a.start);
+          const end = a.end ? parseLocal(a.end) : start + 3600000;
+          await z.call("calendar_add", { title: a.title, start: calTime(start), end: calTime(end), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata",
+            location: a.location || "", description: a.description || "" });
+          return `Added to your Zoho Calendar for ${formatTime(start)}.`;
         }
-        case "check_in": case "check_out":
-          await z.call("people_attendance", { mode: p.name === "check_in" ? "in" : "out", time: peopleTime() });
-          return p.name === "check_in" ? `Checked in at ${formatClock(Date.now())}.` : `Checked out at ${formatClock(Date.now())}.`;
         default: return "I couldn't do that.";
       }
     }
@@ -1870,16 +1319,15 @@ button.dock-label:hover { color: var(--cyan); }
       const safe = async (f) => { try { return await f(); } catch (e) { return `Unavailable: ${e.message}`; } };
       // All six at once (one after another took about 15 seconds); usually already loaded by prefetch().
       const parts = await Promise.all([
-        safe(() => this.listEvents(1)),
+        safe(() => this.listCalendar(1)),
         safe(() => this.listTasks()),
         safe(() => this.listTeamTasks()),
-        safe(async () => json((await this.read("crm_pipeline")).deals, 4000)),
+        safe(async () => { const { deals } = await this.read("crm_pipeline"); return json(deals, 4000) + this.computed(this.crmCard("Deals", deals, "", [], 50, "", false)); }),
         safe(() => this.unreadMail(12)),
         safe(async () => json((await this.read("expense_reports")).reports, 2500)),
-        safe(async () => json((await this.read("people_holidays", this.holidayRange(14), 3600000)).holidays, 1500)),
       ]);
-      const titles = ["## Today's meetings (Zoho CRM)", "## Open CRM tasks", "## Tasks given to the team (open)", "## Open deals (Zoho CRM)", "## Unread mail (Zoho Mail)",
-        "## Expense reports (Zoho Expense)", "## Holidays in the next 14 days (Zoho People)"];
+      const titles = ["## Today's calendar (Zoho Calendar)", "## Open CRM tasks", "## Tasks given to the team (open)", "## Open deals (Zoho CRM)", "## Unread mail (Zoho Mail)",
+        "## Expense reports (Zoho Expense)"];
       return titles.map((t, i) => `${i ? "\n" : ""}${t}\n${parts[i]}`).join("\n");
     }
 
@@ -1895,7 +1343,8 @@ button.dock-label:hover { color: var(--cyan); }
 
     /** Open CRM tasks as { id, title, due (ms or null), date, priority }. */
     async tasks(maxAgeMs = READ_MAX_AGE) {
-      const { tasks = [] } = await this.read("crm_my_tasks", {}, maxAgeMs);
+      const { tasks = [], crmUrl = "" } = await this.read("crm_my_tasks", {}, maxAgeMs);
+      this.lastCrmUrl = crmUrl; this.lastAt = Date.now();
       return tasks.map((t) => ({
         id: String(t.id), title: t.Subject || "(no subject)", date: t.Due_Date || null,
         due: t.Due_Date ? parseLocal(t.Due_Date) : null, priority: t.Priority || "", status: t.Status || "",
@@ -1926,9 +1375,10 @@ button.dock-label:hover { color: var(--cyan); }
     }
 
     /** Open tasks given to others (or one person's), as { id, title, owner, date, due, overdue, priority }. */
-    async teamTasks(person) {
+    async teamTasks(person, maxAgeMs = READ_MAX_AGE) {
       const body = person ? { ownerId: (await this.teamMember(person)).id } : {};
-      const { tasks = [] } = await this.read("crm_team_tasks", body);
+      const { tasks = [], crmUrl = "" } = await this.read("crm_team_tasks", body, maxAgeMs);
+      this.lastCrmUrl = crmUrl; this.lastAt = Date.now();
       const today = startOfToday();
       return tasks.map((t) => {
         const due = t.Due_Date ? parseLocal(t.Due_Date) : null;
@@ -1969,6 +1419,47 @@ button.dock-label:hover { color: var(--cyan); }
       });
       return lines.length ? lines.join("\n") : "No meetings.";
     }
+
+    /** Zoho Calendar events for [days] days from [fromDay] (default today), as { id, title, start, end, allDay, location, link }. */
+    async calendar(days = 1, fromDay = null, maxAgeMs = READ_MAX_AGE) {
+      const first = fromDay ? parseLocal(dateOnly(fromDay)) : startOfToday();
+      const range = !fromDay && days <= AGENDA_DAYS ? this.agendaRange() : { from: first, to: first + days * 86400000 };
+      const until = first + days * 86400000;
+      const { events = [] } = await this.read("calendar_events", range, maxAgeMs);
+      return events.map((e) => {
+        const start = e.allDay ? parseLocal(e.date) : e.start;
+        return { id: e.id, title: e.title, allDay: e.allDay, start, end: e.allDay ? start + 86400000 : e.end, location: e.location || "", link: e.link || "" };
+      }).filter((e) => e.end > first && e.start < until).sort((a, b) => a.start - b.start);
+    }
+
+    async listCalendar(days = 1, fromDay = null) {
+      const list = await this.calendar(days, fromDay);
+      this.sources.push({ kind: "calendar", title: days === 1 ? "Your calendar" : `Your calendar, ${days} days`, rows: list });
+      if (!list.length) return "Nothing in Zoho Calendar for that time.";
+      return list.map((e) => `- ${e.title} (${e.allDay ? `${new Date(e.start).toDateString()}, all day` : `${formatTime(e.start)} to ${formatClock(e.end)}`})${e.location ? ` at ${e.location}` : ""}`).join("\n");
+    }
+
+    /** Builds the chat card for CRM records (and, when [show], adds it to this answer's cards). */
+    crmCard(module, records = [], crmUrl = "", filters = [], limit = 200, title = "", show = true) {
+      const amounts = records.map((r) => Number(r.Amount ?? r.Grand_Total)).filter((n) => Number.isFinite(n));
+      const card = {
+        kind: "crm", title: title || `${module || "CRM"} records`, filters, at: Date.now(),
+        rows: records.map((r) => ({
+          name: recordName(r), amount: r.Amount ?? r.Grand_Total, date: r.Closing_Date || r.Due_Date || (r.Start_DateTime || "").slice(0, 10) || null,
+          note: r.Stage || r.Status || "", link: crmLink(crmUrl, module, r.id),
+        })),
+        count: `${records.length} ${records.length === 1 ? "record" : "records"}`,
+        total: amounts.length ? { label: "Total, counted by the app", value: rupees(amounts.reduce((a, b) => a + b, 0)) } : null,
+        limited: records.length >= limit, all: crmUrl && module ? `${crmUrl}/${CRM_TABS[module] || module}` : "",
+      };
+      if (show) this.sources.push(card);
+      return card;
+    }
+
+    /** The app's own count and total, for Gemini to repeat instead of adding up itself. */
+    computed(card) {
+      return `\nComputed by the app (use exactly these figures): ${card.count}${card.total ? `, total ${card.total.value}` : ""}${card.limited ? ". There may be more records than shown; say so." : "."}`;
+    }
   }
 
   // ---------- agent ----------
@@ -1976,7 +1467,7 @@ button.dock-label:hover { color: var(--cyan); }
   const MAX_STEPS = 6, MAX_HISTORY = 12;
 
   // ...but "search my mail for …" or "look up a lead" is the user's own data, not the web.
-  const OWN_DATA_WORDS = /\b(mails?|e-?mails?|inbox|zoho|crm|leads?|deals?|contacts?|accounts?|tasks?|meetings?|expenses?|reports?|leaves?|holidays?|attendance|customers?|clients?)\b|மெயில்|லீவு/i;
+  const OWN_DATA_WORDS = /\b(mails?|e-?mails?|inbox|zoho|crm|leads?|deals?|contacts?|accounts?|tasks?|meetings?|calendar|schedule|free|expenses?|reports?|customers?|clients?)\b|மெயில்/i;
   const WEB_WORDS = /\b(search|google|look\s*up|web|internet|online)\b|தேடு|கூகுள்|இணையத்தில்/i;
 
   class Agent {
@@ -1988,20 +1479,22 @@ button.dock-label:hover { color: var(--cyan); }
     systemPrompt() {
       return [
         `You are Jo Office, ${this.userName}'s work assistant, in the style of a calm, capable AI butler.`,
-        "You work with the company's Zoho apps: Zoho Mail, Zoho CRM (leads, contacts, accounts, deals, tasks, meetings), Zoho Expense and Zoho People (leave, holidays, attendance).",
+        "You work with the company's Zoho apps: Zoho Mail, Zoho CRM (leads, contacts, accounts, deals, tasks), Zoho Expense and Zoho Calendar (the user's schedule).",
         this.tamil ? "Always reply in Tamil (தமிழ்), using simple spoken Tamil." : "Reply in clear Indian English.",
         "",
         "Your replies are read aloud, so answer in one to four short sentences: no markdown, no bullet points, no emoji, no IDs.",
         'Say money in rupees and dates naturally ("tomorrow at 5 PM").',
         "",
         "Use the functions to look things up rather than guessing. To act on a CRM record, find it first with crm_search.",
-        "Changes (sending mail, creating or updating CRM records, expenses, leave, attendance) are never done straight away:",
+        "Changes (sending mail, creating or updating CRM records, expenses, calendar events) are never done straight away:",
         "the function answers NOT DONE YET, and you then read the change back briefly and ask the user to say yes or no.",
         "Never say a change is done until the user has confirmed it. Before writing an email, make sure you know the recipient's address.",
         "The user leads a team. To give someone a task, use crm_create_task with assign_to (their name); to follow up, use",
         "team_tasks (everyone, or one person); to chase someone, send_email to their address from team_members.",
         "To write an email the user wants to check first, or when they say \"save it as a draft\" instead of yes, use save_draft",
         "(with message_id for a reply). It goes to Zoho Mail Drafts and is not sent.",
+        "Never add up amounts or count records yourself: when a result says \"Computed by the app\", say exactly those figures.",
+        "The records behind your answer are shown to the user as a card, so speak a short summary instead of reading every record.",
         "For anything current or outside the user's Zoho data, use web_search and name the main source in a few words.",
         "",
         "The user speaks, and speech recognition makes mistakes, especially with names and Indian pronunciation. Read their words",
@@ -2033,6 +1526,7 @@ button.dock-label:hover { color: var(--cyan); }
     /** One request; [onTool] is told which tool is running (for the HUD). */
     async ask(text, onTool = () => {}) {
       this.trimHistory();
+      this.tools.sources = [];
       const stats = this.lastStats = { think: 0, data: 0 }; // seconds spent in Gemini and in lookups
       // A change is waiting: a plain "yes" runs it and a plain "no" drops it, without asking Gemini.
       // Anything else is a correction ("no, the name is Ravi Kumar"): Gemini proposes it again.
@@ -2091,7 +1585,7 @@ button.dock-label:hover { color: var(--cyan); }
         `[Now: ${this.now()}]`,
         `Write ${this.userName}'s spoken morning work brief from the data below. Order: a one-line greeting, today's meetings,`,
         "tasks due today or overdue, team members' overdue tasks (by name), deals closing soon, only the emails that look important (skip newsletters and promotions),",
-        "expense reports waiting for approval, and any holiday coming up. Keep numbers exact, say amounts in rupees, about 120 to 180 words.",
+        "and expense reports waiting for approval. Keep numbers exact, say amounts in rupees, about 120 to 180 words.",
         "If a source is not connected or unavailable, mention it in a few words. Plain sentences for text-to-speech: no lists, symbols or markdown.",
         "", data,
       ].join("\n");
@@ -2144,7 +1638,7 @@ button.dock-label:hover { color: var(--cyan); }
     return found.sort((a, b) => a.index - b.index).slice(0, max).map(({ value, label }) => ({ value, label }));
   }
 
-  const api = { SpeechMemory, wordFixes, encodeWav, isYes, isNo, extractFigures, matchWake, DEFAULT_TTS_MODEL, GEMINI_VOICES, describeMail, DEFAULT_MODEL, FALLBACK_MODEL, Gemini, Bridge, Tools, Agent, WRITE_TOOLS, parseLocal, formatTime, formatClock, isoDate, isoLocal, peopleTime, startOfToday, stripHtml };
+  const api = { SpeechMemory, wordFixes, encodeWav, isYes, isNo, extractFigures, matchWake, DEFAULT_TTS_MODEL, GEMINI_VOICES, describeMail, DEFAULT_MODEL, FALLBACK_MODEL, Gemini, Bridge, Tools, Agent, WRITE_TOOLS, parseLocal, formatTime, formatClock, isoDate, isoLocal, calTime, startOfToday, stripHtml };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.JoCore = api;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -2178,7 +1672,7 @@ button.dock-label:hover { color: var(--cyan); }
     userName: "", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
     tamil: false, speak: true,
     voiceEngine: "gemini", fastVoice: true, geminiVoiceEn: "Charon", geminiVoiceTa: "Kore", pcVoiceEn: "", pcVoiceTa: "", ttsModel: "",
-    markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
+    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
@@ -2223,8 +1717,7 @@ button.dock-label:hover { color: var(--cyan); }
     crm_meetings: "CHECKING MEETINGS", crm_pipeline: "CHECKING PIPELINE", crm_create_lead: "CREATING LEAD", crm_add_note: "ADDING NOTE",
     crm_create_task: "CREATING TASK", team_members: "CHECKING TEAM", team_tasks: "CHECKING TEAM TASKS", crm_create_meeting: "ADDING MEETING", crm_update_record: "UPDATING CRM", crm_complete_task: "UPDATING TASK",
     expense_list: "CHECKING EXPENSES", expense_reports: "CHECKING REPORTS", expense_categories: "CHECKING CATEGORIES", add_expense: "ADDING EXPENSE",
-    people_profile: "CHECKING PROFILE", leave_balance: "CHECKING LEAVE", holidays: "CHECKING HOLIDAYS", apply_leave: "APPLYING LEAVE",
-    check_in: "CHECKING IN", check_out: "CHECKING OUT", web_search: "SEARCHING THE WEB",
+    calendar_events: "CHECKING CALENDAR", calendar_add_event: "ADDING TO CALENDAR", remember_correction: "LEARNING A WORD", web_search: "SEARCHING THE WEB",
   };
   // Measures how long the voice takes to start after a reply appears (shown under the reply).
   let voiceTimer = null;
@@ -2239,12 +1732,10 @@ button.dock-label:hover { color: var(--cyan); }
       if (mode === "speaking" && voiceTimer.el) voiceTimer.el.textContent += ` · voice ${((performance.now() - voiceTimer.t) / 1000).toFixed(1)} s`;
       voiceTimer = null;
     }
-    window.JoGraph?.setActivity(mode);
     window.JoViz?.setMode(mode);
-    reactor.className = `reactor ${mode}`;
-    stateEl.className = `state ${mode}`;
+    reactor.className = `bars ${mode}`;
     stateEl.textContent = label || {
-      idle: wakeOn() ? 'STANDING BY · SAY "JO"' : matchMedia("(pointer: coarse)").matches ? "STANDING BY · TAP TO TALK" : "STANDING BY · PRESS SPACE OR TAP TO TALK", listening: "LISTENING…", thinking: "PROCESSING…", speaking: "SPEAKING", error: "ATTENTION",
+      idle: wakeOn() ? 'Standing by · say "Jo"' : "Standing by", listening: "Listening…", thinking: "Thinking…", speaking: "Speaking", error: "Attention",
     }[mode];
     // The wake-word ear only runs while Jo is idle, so it never hears Jo's own voice.
     if (mode === "idle") scheduleWake(); else stopWake();
@@ -2262,9 +1753,9 @@ button.dock-label:hover { color: var(--cyan); }
       opts.stats ? `think ${opts.stats.think.toFixed(1)} s` : "",
       opts.stats?.data ? `data ${opts.stats.data.toFixed(1)} s` : "",
     ].filter(Boolean).join(" · ");
-    div.innerHTML = `<div><div class="who">${who === "me" ? "YOU" : "JO"}</div><div class="bubble${settings.tamil ? " ta" : ""}">${esc(text)}</div>${
-      opts.confirm ? `<div class="confirm"><button class="yes">✔ Yes, do it</button><button class="no">✕ Cancel</button></div>` : ""}${
-      meta ? `<div class="tools">${esc(meta)}</div>` : ""}</div>`;
+    div.innerHTML = `<div class="who">${who === "me" ? "You" : "Jo Office"}</div><div class="bubble${settings.tamil ? " ta" : ""}">${esc(text)}</div>${
+      opts.cards?.length ? renderCards(opts.cards) : ""}${opts.confirm ? confirmCard(opts.confirm) : ""}${
+      meta ? `<div class="tools">${esc(meta)}</div>` : ""}`;
     // Your own words: click to fix a misheard word and send again.
     if (who === "me") {
       const bubble = div.querySelector(".bubble");
@@ -2277,12 +1768,56 @@ button.dock-label:hover { color: var(--cyan); }
     }
     // A change waiting for "yes": the buttons answer just like saying it.
     if (opts.confirm) {
-      document.querySelectorAll(".msg .confirm").forEach((c) => c.remove()); // only the latest can be confirmed
-      div.querySelector(".yes").addEventListener("click", () => ask("Yes"));
-      div.querySelector(".no").addEventListener("click", () => ask("No"));
+      document.querySelectorAll(".msg .confirm-card").forEach((c) => { if (!div.contains(c)) c.remove(); }); // only the latest can be confirmed
     }
     transcript.appendChild(div);
     transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  // ---------- answer cards ----------
+  const rupeeText = (v) => (v === undefined || v === null || v === "" || !Number.isFinite(Number(v)) ? "" : `₹${Math.round(Number(v)).toLocaleString("en-IN")}`);
+  const shortDate = (d) => { if (!d) return ""; const t = typeof d === "number" ? d : JoCore.parseLocal(String(d).slice(0, 10)); return new Date(t).toLocaleDateString("en-IN", { day: "numeric", month: "short" }); };
+  const link = (href, label = "Open in Zoho CRM ↗") => (href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${label}</a>` : "<span></span>");
+  const ROW_LIMIT = 15; // more than this and the card points to Zoho CRM for the rest
+
+  function renderCards(cards) {
+    return cards.map((c) => (c.kind === "mail" ? mailCard(c) : c.kind === "calendar" ? calendarCard(c) : crmCard(c))).join("");
+  }
+  function crmCard(c) {
+    const shown = c.rows.slice(0, ROW_LIMIT);
+    const tags = [...(c.filters || []), c.at ? `Data from ${new Date(c.at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}` : ""].filter(Boolean);
+    return `<div class="card">
+      <div class="card-head"><span>${esc(c.title)}</span><small>${esc(c.count || "")}</small></div>
+      ${tags.length ? `<div class="tags">${tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
+      <div class="rows">${shown.map((r) => `<div class="r"><span class="name${r.overdue ? " overdue" : ""}" title="${esc(r.name)}">${esc(r.name)}${r.note ? ` <small class="date">· ${esc(r.note)}</small>` : ""}</span>
+        <span class="amt">${esc(rupeeText(r.amount))}</span><span class="date${r.overdue ? " overdue" : ""}">${esc(shortDate(r.date))}${r.overdue ? " · overdue" : ""}</span>${link(r.link)}</div>`).join("")}
+      ${c.total ? `<div class="r total"><span>${esc(c.total.label)}</span><span class="amt">${esc(c.total.value)}</span><span class="date">${esc(c.count || "")}</span><span></span></div>` : ""}</div>
+      ${c.rows.length > ROW_LIMIT ? `<div class="card-foot">Showing ${ROW_LIMIT} of ${c.rows.length}.</div>` : ""}
+      ${c.limited ? '<div class="limit">⚠ There may be more records than one lookup reads. Ask me to narrow it down.</div>' : ""}
+      ${c.all ? `<div class="card-foot"><span></span><a class="all" href="${esc(c.all)}" target="_blank" rel="noopener">See all in Zoho CRM ↗</a></div>` : ""}
+    </div>`;
+  }
+  function mailCard(c) {
+    if (!c.rows.length) return "";
+    return `<div class="card"><div class="card-head"><span>${esc(c.title)}</span><small>${c.rows.length}</small></div>${c.rows.slice(0, 8).map((m) => `
+      <div class="mailrow"><div style="min-width:0"><div class="who2">${esc(m.from)}</div><div class="subj">${esc(m.subject || "(no subject)")}</div></div>
+        <div class="btns"><button class="btn" data-ask="${esc(`Read me the email from ${m.from} with subject "${m.subject}"`)}">Read</button>
+        <button class="btn" data-ask="${esc(`Draft a reply to the email from ${m.from} about "${m.subject}"`)}">Draft reply</button></div></div>`).join("")}</div>`;
+  }
+  function calendarCard(c) {
+    if (!c.rows.length) return "";
+    const when = (e) => (e.allDay ? `${shortDate(e.start)}, all day` : `${shortDate(e.start)} · ${new Date(e.start).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}–${new Date(e.end).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`);
+    return `<div class="card"><div class="card-head"><span>${esc(c.title)}</span><small>Zoho Calendar</small></div><div class="rows">${c.rows.map((e) => `
+      <div class="r"><span class="name">${esc(e.title)}${e.location ? ` <small class="date">· ${esc(e.location)}</small>` : ""}</span><span></span><span class="date">${esc(when(e))}</span>${link(e.link, "Open ↗")}</div>`).join("")}</div></div>`;
+  }
+  /** Buttons under a change that waits for "yes"; they answer just like saying it. */
+  function confirmCard(name) {
+    const mail = name === "send_email" || name === "reply_email";
+    const buttons = mail ? [["Yes, send", "Yes", true], ["Save as draft", "No, save it as a draft instead"], ["Cancel", "No"]]
+      : name === "save_draft" ? [["Yes, save draft", "Yes", true], ["Send instead", "Don't save a draft, send it now instead"], ["Cancel", "No"]]
+      : [["Yes, do it", "Yes", true], ["Cancel", "No"]];
+    return `<div class="card confirm-card"><div class="what">Waiting for your yes. Nothing has been changed yet.</div><div class="btns">${
+      buttons.map(([label, say, main]) => `<button class="btn${main ? " primary" : ""}" data-ask="${esc(say)}">${esc(label)}</button>`).join("")}</div></div>`;
   }
 
   // ---------- speech out ----------
@@ -2535,6 +2070,7 @@ button.dock-label:hover { color: var(--cyan); }
     clearTimeout(micIdle);
     if (!micStream || micStream.getAudioTracks().every((t) => t.readyState === "ended")) {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      window.JoViz?.setMic(micStream); // the wave bar follows your voice while Jo listens
     }
     return micStream;
   }
@@ -2771,12 +2307,12 @@ button.dock-label:hover { color: var(--cyan); }
     const used = [], t0 = performance.now();
     try {
       const reply = await a.ask(text, (tool) => { used.push(tool); setState("thinking", TOOL_LABELS[tool] || "PROCESSING…"); });
-      addMsg("jo", reply, { tools: used, stats: a.lastStats || { think: (performance.now() - t0) / 1000, data: 0 }, confirm: !!a.tools.pending });
-      if (!a.tools.pending) document.querySelectorAll(".msg .confirm").forEach((c) => c.remove());
+      addMsg("jo", reply, { tools: used, stats: a.lastStats || { think: (performance.now() - t0) / 1000, data: 0 }, confirm: a.tools.pending?.name, cards: a.tools.sources });
+      if (!a.tools.pending) document.querySelectorAll(".msg .confirm-card").forEach((c) => c.remove());
       showOnStage(reply);
       $("hud-latency").textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s`;
       voiceTimer = { t: performance.now(), el: transcript.lastElementChild?.querySelector(".tools") };
-      renderTasks(); renderAgenda();
+      renderTasks(); renderAgenda(); renderTeam();
       if (used.includes("read_mail")) checkMail(); // it was just marked read in Zoho Mail
       followUpPending = voice; // listen again once the answer has been spoken
       speak(reply);
@@ -2813,19 +2349,35 @@ button.dock-label:hover { color: var(--cyan); }
   // ---------- panels ----------
   function renderSystems() {
     const bridge = !!(settings.bridgeUrl && settings.bridgeKey);
-    const configured = { gemini: !!settings.geminiKey, mail: bridge, crm: bridge, expense: bridge, people: bridge };
-    const rows = [["gemini", "Gemini"], ["mail", "Zoho Mail"], ["crm", "Zoho CRM"], ["expense", "Zoho Expense"], ["people", "Zoho People"]];
+    const configured = { gemini: !!settings.geminiKey, mail: bridge, crm: bridge, expense: bridge, calendar: bridge };
+    const rows = [["gemini", "Gemini"], ["mail", "Mail"], ["crm", "CRM"], ["expense", "Expense"], ["calendar", "Calendar"]];
     $("hud-model").textContent = !settings.geminiKey ? "Offline"
-      : settings.geminiModel === DEFAULT_MODEL ? "Gemini Flash-Lite" : settings.geminiModel.replace(/^gemini-/, "Gemini ");
+      : settings.geminiModel === DEFAULT_MODEL ? "Gemini Flash" : settings.geminiModel.replace(/^gemini-/, "Gemini ");
     $("systems").innerHTML = rows.map(([k, label]) => {
-      const st = !configured[k] ? "off" : health[k] === "err" ? "err" : "ok";
-      const val = { off: "OFFLINE", err: "FAULT", ok: health[k] === "ok" ? "ONLINE" : "READY" }[st];
-      return `<li class="${st}" title="${label}: ${val.toLowerCase()}"><span class="dot"></span><span class="name">${label}</span><span class="val">${val}</span></li>`;
+      const st = !configured[k] ? "off" : health[k] === "err" ? "err" : health[k] === "ok" ? "ok" : "ready";
+      const val = { off: "not set up", err: "problem", ok: "connected", ready: "set up" }[st];
+      return `<li class="${st}" title="${label}: ${val}"><span class="dot"></span>${label}</li>`;
     }).join("");
-    const states = rows.map(([k]) => (!configured[k] ? "off" : health[k] === "err" ? "err" : "ok"));
-    const ok = states.filter((x) => x === "ok").length, faults = states.filter((x) => x === "err").length;
-    $("sys-summary").textContent = faults ? `${faults} FAULT${faults > 1 ? "S" : ""}` : `${ok}/${rows.length} ONLINE`;
-    $("sys-summary").classList.toggle("warn", faults > 0 || ok < rows.length);
+  }
+
+  // Tasks you gave the team: overdue first.
+  let teamBusy = false;
+  async function renderTeam(fresh = false) {
+    const tools = buildTools();
+    if (!tools.bridge) { $("team").innerHTML = '<li class="muted">Zoho CRM not connected.</li>'; return; }
+    if (teamBusy) return;
+    teamBusy = true;
+    try {
+      const list = await tools.teamTasks(undefined, fresh ? 0 : undefined);
+      const overdue = list.filter((t) => t.overdue);
+      $("team-count").textContent = overdue.length ? `${overdue.length} overdue` : list.length ? String(list.length) : "";
+      $("team").innerHTML = list.length ? [...overdue, ...list.filter((t) => !t.overdue)].slice(0, 6).map((t) => `
+        <li data-owner="${esc(t.owner)}" title="Ask about ${esc(t.owner)}'s tasks"><span>${esc(t.owner || "Someone")} · ${esc(t.title)}</span>
+          <span class="sub${t.overdue ? " bad" : ""}">${t.date ? `${t.overdue ? "Overdue · " : "Due "}${esc(shortDate(t.date))}` : "No due date"}</span></li>`).join("")
+        : '<li class="muted">No open tasks with your team. Say "give Ravi a task…"</li>';
+    } catch (e) {
+      $("team").innerHTML = `<li class="muted">${esc(e.message)}</li>`;
+    } finally { teamBusy = false; }
   }
 
   // Open Zoho CRM tasks (the user's own). The ↻ button (fresh) always asks Zoho; otherwise data up to two minutes old is fine.
@@ -2854,28 +2406,29 @@ button.dock-label:hover { color: var(--cyan); }
       </li>`).join("") : '<li class="muted">No open CRM tasks. Say "add a follow-up task…"</li>';
   }
 
-  // Zoho CRM meetings, today and tomorrow.
+  // Zoho Calendar, today and tomorrow.
   let agendaBusy = false;
   async function renderAgenda(fresh = false) {
     const tools = buildTools();
-    if (!tools.bridge) { $("agenda").innerHTML = '<li class="muted">Zoho CRM not connected.</li>'; return; }
+    if (!tools.bridge) { $("agenda").innerHTML = '<li class="muted">Zoho Calendar not connected.</li>'; return; }
     if (agendaBusy) return;
     agendaBusy = true;
     try {
-      const list = await tools.events(2, fresh ? 0 : undefined);
+      const list = await tools.calendar(2, null, fresh ? 0 : undefined);
       const tomorrow = startOfToday() + 86400000;
       const item = (e) => {
-        const when = e.allDay ? "ALL DAY" : new Date(e.start).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }).toUpperCase();
-        const day = e.start >= tomorrow ? "TMRW " : "";
-        return `<li><span class="when">${day}${esc(when)}</span><span><span class="what">${esc(e.title)}</span>${
-          e.location ? `<div class="where">${esc(e.location)}</div>` : ""}</span></li>`;
+        const when = e.allDay ? "All day" : new Date(e.start).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+        const day = e.start >= tomorrow ? "Tmrw " : "";
+        const now = !e.allDay && e.start <= Date.now() && e.end > Date.now();
+        return `<li class="${now ? "now" : ""}"><span class="when">${day}${esc(when)}</span><span>${esc(e.title)}${
+          e.location ? `<span class="sub">${esc(e.location)}</span>` : ""}</span></li>`;
       };
       const upcoming = list.filter((e) => e.end > Date.now() || e.allDay);
-      $("agenda").innerHTML = upcoming.length ? upcoming.map(item).join("") : '<li class="muted">No meetings today or tomorrow.</li>';
-      setHealth("crm", "ok");
+      $("agenda").innerHTML = upcoming.length ? upcoming.map(item).join("") : '<li class="muted">Nothing in your calendar today or tomorrow.</li>';
+      setHealth("calendar", "ok");
     } catch (e) {
       $("agenda").innerHTML = `<li class="muted">${esc(e.message)}</li>`;
-      setHealth("crm", "err");
+      setHealth("calendar", "err");
     } finally { agendaBusy = false; }
   }
 
@@ -2883,6 +2436,8 @@ button.dock-label:hover { color: var(--cyan); }
     const d = new Date();
     $("clock-time").textContent = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
     $("clock-date").textContent = d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const part = d.getHours() < 12 ? "Good morning" : d.getHours() < 17 ? "Good afternoon" : "Good evening";
+    $("greeting").textContent = `· ${part}${settings.userName ? `, ${settings.userName}` : ""}`;
   }
 
   // ---------- notifications, reminders, brief schedule ----------
@@ -2937,7 +2492,7 @@ button.dock-label:hover { color: var(--cyan); }
       <li class="${freshIds.has(m.messageId) ? "fresh" : ""}" data-from="${esc(m.from)}" data-subject="${esc(m.subject)}" title="Ask Jo to read this email">
         <div class="from">${esc(m.from)}</div>
         <div class="subj">${esc(m.subject || "(no subject)")}</div>
-        <div class="meta">${m.folder ? `<span class="folder">${esc(m.folder.toUpperCase())}</span>` : ""}${esc(m.received ? formatAgo(m.received) : "")}</div>
+        <div class="meta">${m.folder ? `${esc(m.folder)} · ` : ""}${esc(m.received ? formatAgo(m.received) : "")}</div>
       </li>`).join("") : '<li class="muted">No unread mail. All clear.</li>';
   }
 
@@ -2981,10 +2536,16 @@ button.dock-label:hover { color: var(--cyan); }
       : '<li class="muted">Nothing yet. Correct a misheard word once and it appears here.</li>';
   }
   function closeSettings() { $("settings").hidden = true; $("drawer-backdrop").hidden = true; }
+  function applyTheme(t = settings.theme) {
+    const theme = ["navy", "graphite", "light"].includes(t) ? t : "navy";
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", { navy: "#0E1726", graphite: "#1E2124", light: "#F6F7F9" }[theme]);
+  }
   function collectSettings() {
     document.querySelectorAll("[data-setting]").forEach((el) => setField(el.dataset.setting,
       el.type === "checkbox" ? el.checked : el.type === "number" ? Math.max(0, Number(el.value) || 0) : el.value.trim()));
     if (!settings.geminiModel) settings.geminiModel = DEFAULT_MODEL;
+    applyTheme();
     const engine = $("voice-engine").value;
     if (engine === "gemini") { settings.geminiVoiceEn = $("voice-en").value; settings.geminiVoiceTa = $("voice-ta").value; }
     else { settings.pcVoiceEn = $("voice-en").value; settings.pcVoiceTa = $("voice-ta").value; }
@@ -3009,7 +2570,7 @@ button.dock-label:hover { color: var(--cyan); }
           if (!tools.bridge) throw new Error("Fill in the bridge URL and key first.");
           // One check per Zoho app, so a missing scope shows exactly where.
           const status = await tools.bridge.call("zoho_status");
-          const names = { mail: "Zoho Mail", crm: "Zoho CRM", expense: "Zoho Expense", people: "Zoho People" };
+          const names = { mail: "Zoho Mail", crm: "Zoho CRM", expense: "Zoho Expense", calendar: "Zoho Calendar" };
           result = Object.entries(names).map(([k, label]) => {
             setHealth(k, status[k] === "ok" ? "ok" : "err");
             return status[k] === "ok" ? `✔ ${label}` : `✖ ${label}: ${status[k]}`;
@@ -3023,7 +2584,7 @@ button.dock-label:hover { color: var(--cyan); }
           await tools.bridge.call("zoho_connect", { code });
           $("zoho-code").value = "";
           checkMail(); renderTasks(); renderAgenda();
-          result = "Zoho connected. Click Test Zoho apps to check Mail, CRM, Expense and People."; break;
+          result = "Zoho connected. Click Test Zoho apps to check Mail, CRM, Expense and Calendar."; break;
         }
       }
       out.textContent = `✔ ${kind}\n${String(result).slice(0, 1200)}`;
@@ -3101,14 +2662,21 @@ button.dock-label:hover { color: var(--cyan); }
   });
   $("refresh-agenda").addEventListener("click", () => renderAgenda(true));
   $("refresh-tasks").addEventListener("click", () => renderTasks(true));
-  // Systems in the dock: collapsed to dots by default; the choice is remembered on this device.
-  const setSystemsOpen = (open) => {
-    $("dock-systems").classList.toggle("collapsed", !open);
-    $("toggle-systems").setAttribute("aria-expanded", String(open));
-    try { localStorage.setItem("office.systemsOpen", open ? "1" : ""); } catch { /* private mode */ }
-  };
-  try { if (localStorage.getItem("office.systemsOpen")) setSystemsOpen(true); } catch { /* private mode */ }
-  ["toggle-systems", "sys-summary"].forEach((id) => $(id).addEventListener("click", () => setSystemsOpen($("dock-systems").classList.contains("collapsed"))));
+  // Buttons inside answer cards (Read, Draft reply, Yes, Cancel…) ask just like typing it.
+  transcript.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-ask]");
+    if (b) { b.closest(".confirm-card")?.remove(); ask(b.dataset.ask); }
+  });
+  $("refresh-team").addEventListener("click", () => renderTeam(true));
+  $("team").addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-owner]"); if (!li) return;
+    closeToday(); ask(`What tasks are pending with ${li.dataset.owner}?`);
+  });
+  // Phone: the Today panel slides in from the left.
+  const closeToday = () => $("today-panel").classList.remove("open");
+  $("toggle-today").addEventListener("click", () => $("today-panel").classList.toggle("open"));
+  $("mail").addEventListener("click", closeToday);
+  $("theme-select").addEventListener("change", (e) => applyTheme(e.target.value));
   $("clear-convo").addEventListener("click", () => {
     transcript.innerHTML = "";
     agent?.reset();
@@ -3162,6 +2730,7 @@ button.dock-label:hover { color: var(--cyan); }
     settings.wakeWord = false; settings.fileWakeChosen = true; saveSettings();
     setTimeout(() => toast("Opened as a file, so Chrome asks for the microphone each time. Put Jo Office on a web address to be asked only once."), 1500);
   }
+  applyTheme();
   setLang(settings.tamil); renderMute(); renderWake(); renderFullscreen(); renderSystems(); renderTasks(); tickClock(); setState("idle");
   const hello = settings.userName ? `, ${settings.userName}` : "";
   addMsg("jo", settings.geminiKey
@@ -3172,6 +2741,8 @@ button.dock-label:hover { color: var(--cyan); }
   setInterval(checkBrief, 60000);
   setInterval(() => renderAgenda(true), 10 * 60000);
   setInterval(() => renderTasks(true), 5 * 60000); // picks up tasks added in Zoho CRM elsewhere
+  setInterval(() => renderTeam(true), 10 * 60000);
+  renderTeam();
   // Keep what the brief and common questions need loaded, so answers don't wait for Zoho.
   const prefetch = () => { if (document.visibilityState === "visible" && !busy) buildTools().prefetch(); };
   setTimeout(prefetch, 3000);
