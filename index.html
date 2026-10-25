@@ -998,8 +998,10 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 
     // Zoho Mail
     fn("get_unread_mail", "List unread emails across all Zoho Mail folders, newest first.", { limit: ["integer", "How many, default 10"] }),
-    fn("search_mail", "Search Zoho Mail. Plain words search everything; Zoho syntax like subject:xyz or sender:a@b.com also works.",
-      { query: ["string", "Search words"], limit: ["integer", "How many, default 8"] }, ["query"]),
+    fn("search_mail", "Search Zoho Mail across all folders (not Spam or Trash), or inside one folder. Plain words search everything; Zoho syntax like subject:xyz or sender:a@b.com also works.",
+      { query: ["string", "Search words (may be empty when a folder is given)"], folder: ["string", "Optional: a folder name, e.g. Uflex or Priority"],
+        limit: ["integer", "How many, default 8"] }),
+    fn("list_mail_folders", "List the names of the user's Zoho Mail folders.", {}),
     fn("read_mail", "Read the full text of one email found by get_unread_mail or search_mail.",
       { folder_id: ["string", "folderId from the list"], message_id: ["string", "messageId from the list"] }, ["folder_id", "message_id"]),
     fn("send_email", "Send a new email from the user's Zoho Mail. Needs the user's confirmation before it is sent.", {
@@ -1183,11 +1185,18 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
           case "get_unread_mail": {
             const mails = (await this.mail()).slice(0, args.limit || 10);
             this.sources.push({ kind: "mail", title: "Unread mail", rows: mails });
-            return mails.length ? mails.map(describeMail).join("\n") : "No unread mail.";
+            const { folders = 0, missed = [] } = this.mailCoverage || {};
+            const checked = folders ? `\n(Checked ${folders} mail folders${missed.length ? `; could not read: ${missed.join(", ")}, say so` : ""}.)` : "";
+            return (mails.length ? mails.map(describeMail).join("\n") : "No unread mail.") + checked;
           }
           case "search_mail": {
-            const { mails } = await z().call("mail_search", { query: args.query, limit: args.limit || 8 });
+            const { mails } = await z().call("mail_search", { query: args.query || "", folder: args.folder || "", limit: args.limit || 8 });
+            if (mails.length) this.sources.push({ kind: "mail", title: args.folder ? `Mail in ${args.folder}` : `Mail matching "${args.query}"`, rows: mails });
             return mails.length ? mails.map(describeMail).join("\n") : "No matching emails.";
+          }
+          case "list_mail_folders": {
+            const { folders } = await this.read("mail_folders", {}, 3600000);
+            return `Mail folders: ${folders.join(", ")}`;
           }
           case "read_mail": {
             const { content } = await z().call("mail_read", { folderId: args.folder_id, messageId: args.message_id, markRead: this.markRead });
@@ -1415,7 +1424,9 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 
     /** Unread mail, newest first; always fetched as one list of 30 so every caller shares it. */
     async mail(maxAgeMs = READ_MAX_AGE) {
-      return (await this.read("mail_unread", { limit: MAIL_FETCH }, maxAgeMs)).mails || [];
+      const r = await this.read("mail_unread", { limit: MAIL_FETCH }, maxAgeMs);
+      this.mailCoverage = { folders: r.folders || 0, missed: r.missed || [] }; // which folders were checked
+      return r.mails || [];
     }
 
     async unreadMail(limit) {
