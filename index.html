@@ -369,6 +369,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       <p class="hint">Mail senders are added automatically. Misheard anyway? Say "no, I said …", or click your message in the conversation to fix it and send again. Jo Office remembers the fix from then on.</p>
       <label>Learned words (corrections you made)</label>
       <ul class="learned" id="learned-list"></ul>
+      <label class="row"><input type="checkbox" data-setting="voiceReview"> Check before sending: what you say appears in the text box so you can edit it; press Enter to send (turn off to send as soon as you stop talking)</label>
       <label class="row"><input type="checkbox" data-setting="conversation"> Conversation mode: keep listening for a follow-up after each spoken answer (press Esc to stop)</label>
       <p class="hint" id="voice-hint"></p>
       <details class="direct"><summary>Gemini voice model (advanced)</summary>
@@ -692,18 +693,19 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
      * better than the browser's recogniser; [hints] are names and words the user often says, and
      * [heard] is the browser's rough version, which helps with words the recording muffles.
      */
-    async transcribe(audioBase64, mimeType, { hints = [], tamil = false, heard = "", learned = [] } = {}) {
+    async transcribe(audioBase64, mimeType, { hints = [], tamil = false, heard = "", learned = [], context = "" } = {}) {
       const prompt = [
         `Write down exactly what the speaker says in this recording${tamil ? ", in Tamil script (keep English words and names in English)" : ", in English"}.`,
         "The speaker is in Tamil Nadu, India, talking to their work assistant about mail, customers, CRM, expenses or meetings.",
         hints.length ? `Names and words they often use; when a word sounds like one of these, use this spelling: ${hints.join(", ")}.` : "",
         learned.length ? `This speaker has corrected these before (was written → what they meant): ${learned.slice(-60).map((x) => `"${x.heard}" → "${x.meant}"`).join("; ")}.` : "",
+        context ? `The conversation so far (the speaker is probably continuing it):\n${context}` : "",
         heard ? `A rough automatic transcript, which may have mistakes: "${heard}"` : "",
         "Reply with only the spoken words: no quotes, labels or notes. If nothing is said, reply with nothing.",
       ].filter(Boolean).join("\n");
       const json = await this.request(
         { contents: [{ role: "user", parts: [{ inlineData: { mimeType, data: audioBase64 } }, { text: prompt }] }] },
-        { models: [FALLBACK_MODEL, DEFAULT_MODEL] }, // the quick model first: this sits before every answer
+        { models: [DEFAULT_MODEL, FALLBACK_MODEL] }, // the stronger model: it hears names and accents better
       );
       return Gemini.text(Gemini.parse(json)).replace(/^["'“]+|["'”]+$/g, "").replace(/\s+/g, " ").trim();
     }
@@ -1131,7 +1133,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       const age = 60000; // refresh only what is over a minute old (the panels load some of it already)
       await Promise.all([
         this.read("mail_unread", { limit: MAIL_FETCH }, age), this.read("crm_my_tasks", {}, age), this.read("calendar_events", this.agendaRange(), age),
-        this.read("crm_pipeline", {}, age), this.read("expense_reports", {}, age), this.read("crm_team_tasks", {}, age)
+        this.read("crm_pipeline", {}, age), this.read("expense_reports", {}, age), this.read("crm_team_tasks", {}, age),
+        this.read("crm_users", {}, 600000), // the team, so giving someone a task doesn't wait for it
       ].map((p) => p.catch(() => {})));
     }
     agendaRange(days = AGENDA_DAYS) { const from = startOfToday(); return { from, to: from + days * 86400000 }; }
@@ -1463,16 +1466,17 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   }
 
   // ---------- agent ----------
-  // A shorter history means less to send to Gemini each time, so quicker answers.
-  const MAX_STEPS = 6, MAX_HISTORY = 12;
+  // The conversation is kept so follow-ups ("and his phone number?", "assign that to Ravi") make sense.
+  // The latest exchanges keep their lookups; older ones keep only what was said, so they stay small.
+  const MAX_STEPS = 6, MAX_TURNS = 12, FULL_TURNS = 2;
 
   // ...but "search my mail for …" or "look up a lead" is the user's own data, not the web.
   const OWN_DATA_WORDS = /\b(mails?|e-?mails?|inbox|zoho|crm|leads?|deals?|contacts?|accounts?|tasks?|meetings?|calendar|schedule|free|expenses?|reports?|customers?|clients?)\b|மெயில்/i;
   const WEB_WORDS = /\b(search|google|look\s*up|web|internet|online)\b|தேடு|கூகுள்|இணையத்தில்/i;
 
   class Agent {
-    constructor(gemini, tools, tamil = false, userName = "") {
-      Object.assign(this, { gemini, tools, tamil, userName: userName || "the user", contents: [] });
+    constructor(gemini, tools, tamil = false, userName = "", history = []) {
+      Object.assign(this, { gemini, tools, tamil, userName: userName || "the user", contents: Array.isArray(history) ? history : [] });
     }
     reset() { this.contents = []; this.tools.cancel(); }
 
@@ -1512,10 +1516,35 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 
     now() { return new Date().toLocaleString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit" }); }
 
-    trimHistory() {
-      if (this.contents.length <= MAX_HISTORY) return;
+    /** The conversation as exchanges, each starting with something the user said. */
+    turns() {
       const isUserText = (c) => c.role === "user" && c.parts?.[0]?.text !== undefined;
-      while (this.contents.length > MAX_HISTORY / 2 || (this.contents.length && !isUserText(this.contents[0]))) this.contents.shift();
+      const turns = [];
+      for (const c of this.contents) {
+        if (isUserText(c)) turns.push([c]);
+        else if (turns.length) turns[turns.length - 1].push(c);
+      }
+      return turns;
+    }
+
+    /** Keeps the last MAX_TURNS exchanges; all but the latest FULL_TURNS shrink to question and answer. */
+    trimHistory() {
+      const turns = this.turns().slice(-MAX_TURNS);
+      this.contents = turns.flatMap((t, i) => (i >= turns.length - FULL_TURNS ? t : Agent.compact(t)));
+    }
+    static compact(turn) {
+      const reply = [...turn].reverse().find((c) => c.role === "model" && Gemini.text(c));
+      return reply ? [turn[0], { role: "model", parts: [{ text: Gemini.text(reply) }] }] : [turn[0]];
+    }
+
+    /** The conversation in a small form that can be saved and given back to the constructor. */
+    saved() {
+      return this.turns().slice(-MAX_TURNS).flatMap(Agent.compact);
+    }
+
+    /** The last few lines of the conversation as plain text, to help hear the next question. */
+    recentText(lines = 4) {
+      return this.saved().slice(-lines).map((c) => `${c.role === "model" ? "Assistant" : "User"}: ${String(c.parts[0].text).replace(/^\[Now:[^\]]*\]\s*/, "").replace(/^\[This change[^\]]*\]\s*/, "").slice(0, 300)}`).join("\n");
     }
 
     /** Records an exchange that didn't go through Gemini, so the conversation stays complete. */
@@ -1672,7 +1701,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     userName: "", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
     tamil: false, speak: true,
     voiceEngine: "gemini", fastVoice: true, geminiVoiceEn: "Charon", geminiVoiceTa: "Kore", pcVoiceEn: "", pcVoiceTa: "", ttsModel: "",
-    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
+    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, voiceReview: true, geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
@@ -1703,10 +1732,19 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       const gemini = new Gemini(settings.geminiKey, settings.geminiModel);
       const tools = buildTools();
       tools.search = gemini; // web search uses the same Gemini key
-      agent = new Agent(gemini, tools, settings.tamil, settings.userName);
+      agent = new Agent(gemini, tools, settings.tamil, settings.userName, savedHistory().contents);
     }
     return agent;
   }
+  // The conversation is saved so a reload or a settings change doesn't forget it; it starts fresh after 12 hours.
+  const HISTORY_MS = 12 * 3600000;
+  function savedHistory() {
+    const h = readJson("office.history", null);
+    return h && Date.now() - h.at < HISTORY_MS && Array.isArray(h.contents) ? h : { at: 0, contents: [] };
+  }
+  const saveHistory = () => { if (agent) storage.setItem("office.history", JSON.stringify({ at: Date.now(), contents: agent.saved() })); };
+  /** What the user typed or said, without the notes the app adds for Gemini. */
+  const plainAsk = (t) => String(t).replace(/^\[Now:[^\]]*\]\s*/, "").replace(/^\[This change[^\]]*\]\s*/, "");
 
   // ---------- HUD state ----------
   const reactor = $("reactor"), stateEl = $("state");
@@ -2110,8 +2148,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     setState("thinking", "UNDERSTANDING…");
     try {
       const text = await Promise.race([
-        new Gemini(settings.geminiKey, settings.geminiModel).transcribe(wav, "audio/wav", { hints: speechHints(), tamil: settings.tamil, heard, learned: learned.all() }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("slow")), 6000)),
+        new Gemini(settings.geminiKey, settings.geminiModel).transcribe(wav, "audio/wav", { hints: speechHints(), tamil: settings.tamil, heard, learned: learned.all(), context: agent?.recentText() || "" }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("slow")), 8000)),
       ]);
       return text || heard;
     } catch {
@@ -2128,6 +2166,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   const FIRST_WORD_MS = 8000; // time to start speaking after tapping the mic
   const FOLLOW_UP_MS = 6000;  // conversation mode: time to start a follow-up before standing by
   let rec = null, finishListening = null, cancelListening = null;
+  const review = () => settings.voiceReview !== false;
+  let voiceDraft = null; // spoken words waiting in the box; editing them teaches Jo the right words
   async function listen(prefix = "", { followUp = false } = {}) {
     if (rec) { finishListening?.(); return; }
     if (!Recognition) { toast("Voice input needs Chrome or Edge. You can still type."); return; }
@@ -2137,10 +2177,11 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     if (rec) return;
     const recording = startRecording(); // in parallel, so the recogniser isn't held up
     const input = $("ask-input");
+    const draft = review() ? input.value.trim() : ""; // talking again adds to what's waiting in the box
     let spoken = prefix ? `${prefix} ` : ""; // text from recognisers that already ended
     let current = "", interim = "";
     let finished = false, silence = null;
-    const text = () => (spoken + current + interim).replace(/\s+/g, " ").trim();
+    const text = () => `${draft} ${spoken}${current}${interim}`.replace(/\s+/g, " ").trim();
     const waitFor = (ms) => { clearTimeout(silence); silence = setTimeout(finish, ms); };
     function finish() {
       if (finished) return;
@@ -2156,15 +2197,23 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       rec = null; finishListening = cancelListening = null;
       if (cancelled) spoken = "";
       $("mic").classList.remove("live");
-      input.value = "";
+      input.value = draft;
       const heard = spoken.replace(/\s+/g, " ").trim();
       const recorded = await recording;
       if (!heard) { recorded?.discard(); setState("idle"); return; }
+      if (review()) input.value = `${draft} ${heard}`.trim(); // shown while Gemini listens again
       // The wake-word words came before the recording started, so they're kept as heard.
       const rest = heard.slice(prefix.length).trim();
       const said = recorded && rest ? `${prefix} ${await understand(recorded, rest)}`.trim() : heard;
       recorded?.discard();
-      ask(learned.apply(said), { voice: true }); // learned corrections, even if Gemini missed one
+      const fixed = learned.apply(said); // learned corrections, even if Gemini missed one
+      if (!review()) { input.value = ""; ask(fixed, { voice: true }); return; }
+      // Like typing: the words wait in the box to be checked or edited, and Enter sends them.
+      input.value = `${draft} ${fixed}`.trim();
+      voiceDraft = input.value;
+      setState("idle", "Check the text · Enter to send");
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
     };
     const start = () => {
       const r = new Recognition();
@@ -2221,7 +2270,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     if (wakeOn()) wakeTimer = setTimeout(startWake, delay);
   }
   function startWake() {
-    if (!wakeOn() || wakeRec || rec || busy || isSpeaking() || !reactor.classList.contains("idle")) return;
+    if (!wakeOn() || wakeRec || rec || busy || isSpeaking() || !reactor.classList.contains("idle") || document.activeElement === $("ask-input")) return;
     const r = new Recognition();
     r.lang = settings.tamil ? "ta-IN" : "en-IN";
     r.continuous = true;
@@ -2315,6 +2364,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       renderTasks(); renderAgenda(); renderTeam();
       if (used.includes("read_mail")) checkMail(); // it was just marked read in Zoho Mail
       followUpPending = voice; // listen again once the answer has been spoken
+      saveHistory();
       speak(reply);
     } catch (e) {
       addMsg("jo", e.message, { error: true });
@@ -2368,6 +2418,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     if (teamBusy) return;
     teamBusy = true;
     try {
+      tools.team().then((users) => users.forEach((u) => u.name && knownNames.add(u.name))).catch(() => {});
       const list = await tools.teamTasks(undefined, fresh ? 0 : undefined);
       const overdue = list.filter((t) => t.overdue);
       $("team-count").textContent = overdue.length ? `${overdue.length} overdue` : list.length ? String(list.length) : "";
@@ -2612,13 +2663,16 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   $("ask-form").addEventListener("submit", (e) => {
     e.preventDefault(); const v = $("ask-input").value; $("ask-input").value = "";
     $("ask-input").blur(); // so Space (talk) and F (full screen) work again after asking
-    if (editingFrom) {
-      const fixes = wordFixes(editingFrom, v);
+    const spoken = voiceDraft !== null;
+    const from = editingFrom || voiceDraft;
+    if (from) {
+      const fixes = wordFixes(from, v);
       fixes.forEach((f) => learned.add(f.heard, f.meant));
       if (fixes.length) toast(`Learned: ${fixes.map((f) => `"${f.heard}" → "${f.meant}"`).join(", ")}. (Settings › Learned words to undo.)`);
       editingFrom = null;
     }
-    ask(v);
+    voiceDraft = null;
+    ask(v, { voice: spoken });
   });
   document.addEventListener("keydown", (e) => {
     const typing = /INPUT|TEXTAREA/.test(document.activeElement?.tagName);
@@ -2626,6 +2680,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     if (e.key.toLowerCase() === "f" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && $("settings").hidden) toggleFullscreen();
     if (e.key === "Escape") {
       if (!$("settings").hidden) closeSettings();
+      else if (voiceDraft !== null && !rec) { $("ask-input").value = ""; voiceDraft = null; $("ask-input").blur(); setState("idle"); }
       else { followUpPending = false; cancelListening?.(); stopSpeaking(); setState("idle"); } // Escape ends the conversation
     }
   });
@@ -2680,6 +2735,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   $("clear-convo").addEventListener("click", () => {
     transcript.innerHTML = "";
     agent?.reset();
+    storage.removeItem("office.history");
     window.JoViz?.clear();
     addMsg("jo", settings.tamil ? "புதிய உரையாடல். சொல்லுங்கள்." : "New conversation. What do you need?");
   });
@@ -2733,7 +2789,11 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   applyTheme();
   setLang(settings.tamil); renderMute(); renderWake(); renderFullscreen(); renderSystems(); renderTasks(); tickClock(); setState("idle");
   const hello = settings.userName ? `, ${settings.userName}` : "";
-  addMsg("jo", settings.geminiKey
+  const earlier = savedHistory().contents;
+  if (earlier.length) {
+    earlier.forEach((c) => addMsg(c.role === "model" ? "jo" : "me", c.role === "model" ? c.parts[0].text : plainAsk(c.parts[0].text)));
+    addMsg("jo", settings.tamil ? "முந்தைய உரையாடலைத் தொடரலாம். புதிதாகத் தொடங்க 'New' அழுத்துங்கள்." : "Carrying on from our earlier conversation. Tap ⟲ New (above) to start fresh.");
+  } else addMsg("jo", settings.geminiKey
     ? (settings.tamil ? `வணக்கம்${hello}. நான் தயார்.` : `Good to see you${hello}. All systems ready. What do you need?`)
     : `Welcome${hello}. Open Settings (the gear, top right), add your name and your free Gemini key, then connect Zoho.`);
   renderAgenda();
