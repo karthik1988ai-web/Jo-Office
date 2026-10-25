@@ -227,6 +227,12 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
 
+/* A waiting email: shown in full and editable before it's sent or saved */
+.mail-edit label { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 8px; margin: 6px 0; font-size: 12.5px; color: var(--sub); }
+.mail-edit input, .mail-edit textarea { width: 100%; padding: 6px 8px; background: var(--card-2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: inherit; font-size: 13px; outline: none; }
+.mail-edit textarea { display: block; margin: 8px 0 10px; line-height: 1.5; resize: vertical; }
+.mail-edit input:focus, .mail-edit textarea:focus { border-color: var(--acc); }
+
 </style>
 </head>
 <body>
@@ -348,6 +354,21 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         <option value="gemini-2.5-flash-lite">
       </datalist>
       <button class="test" data-test="gemini">Test Gemini</button>
+    </section>
+
+    <section>
+      <h3>Email writing</h3>
+      <p class="hint">Jo has every email written properly before you see it, then shows it in the chat for you to edit, send or save as a draft. Notes and task names are spell-checked too. Gemini is free; ChatGPT and Claude need their own API key (paid per use, separate from a ChatGPT or Claude subscription). If they fail, Gemini writes it.</p>
+      <label>Who writes your emails
+        <select data-setting="writerEngine">
+          <option value="gemini">Gemini (free, your key above)</option>
+          <option value="openai">ChatGPT (OpenAI API key)</option>
+          <option value="claude">Claude (Anthropic API key)</option>
+        </select></label>
+      <label>OpenAI API key (platform.openai.com)<input type="password" data-setting="openaiKey" autocomplete="off"></label>
+      <label>OpenAI model<input data-setting="openaiModel" placeholder="gpt-5" spellcheck="false"></label>
+      <label>Claude API key (console.anthropic.com)<input type="password" data-setting="claudeKey" autocomplete="off"></label>
+      <button class="test" data-test="writer">Test email writer</button>
     </section>
 
     <section>
@@ -1051,6 +1072,12 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   // Changes are never made straight away: Jo Office reads them back and waits for "yes".
   const READ_MAX_AGE = 2 * 60000; // answers may use Zoho data up to two minutes old
   const MAIL_FETCH = 30, AGENDA_DAYS = 7;
+  const MAIL_TOOLS = new Set(["send_email", "reply_email", "save_draft"]);
+  // Text fields that are proofread before they're saved in Zoho.
+  const PROOFREAD = {
+    crm_add_note: ["content"], crm_create_task: ["subject", "description"], crm_create_lead: ["description"],
+    crm_create_meeting: ["title"], add_expense: ["description"], calendar_add_event: ["title", "description"],
+  };
   const WRITE_TOOLS = new Set(["send_email", "reply_email", "save_draft", "crm_create_lead", "crm_add_note", "crm_create_task", "crm_create_meeting",
     "crm_update_record", "crm_complete_task", "add_expense", "calendar_add_event"]);
   // A reply confirms or cancels only when it is nothing but that: "yes, but make it Friday" and
@@ -1076,8 +1103,11 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   const money = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 
   class Tools {
-    constructor({ bridge = null, search = null, memory = null, markRead = true }) {
-      Object.assign(this, { bridge, search, memory, markRead }); // markRead: emails read out are marked read in Zoho Mail
+    constructor({ bridge = null, search = null, memory = null, markRead = true, writer = null }) {
+      Object.assign(this, { bridge, search, memory, markRead, writer }); // markRead: emails read out are marked read in Zoho Mail
+      this.request = ""; this.context = ""; // what the user just asked, and the conversation, for the writer
+      this.readMails = new Map(); // messageId -> text of emails read in this conversation, for replies
+      this.written = new Set(); // email bodies already written or edited by the user: not rewritten again
       this.pending = null; // { name, args, summary } waiting for the user's yes
       this.sources = []; // cards for the chat: the records behind this answer
     }
@@ -1161,7 +1191,9 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
           }
           case "read_mail": {
             const { content } = await z().call("mail_read", { folderId: args.folder_id, messageId: args.message_id, markRead: this.markRead });
-            return clip(stripHtml(content), 5000);
+            const text = clip(stripHtml(content), 5000);
+            this.readMails.set(String(args.message_id), text);
+            return text;
           }
           case "crm_search": {
             const { records, crmUrl } = await z().call("crm_search", { module: args.module, word: args.word, limit: args.limit || 10 });
@@ -1222,9 +1254,56 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       this.zoho();
       // A task for someone else: find who, before anything is read back.
       if (name === "crm_create_task" && args.assign_to) args = { ...args, owner: await this.teamMember(args.assign_to) };
+      args = await this.polish(name, args);
+      if (args.question) return `NOT DONE. Something is missing. Ask the user exactly this, in one short sentence: ${args.question}`;
       const summary = this.summarize(name, args);
       this.pending = { name, args, summary, fresh: true };
       return `NOT DONE YET. Read this back in one or two short sentences and ask the user to say yes to confirm or no to cancel: ${summary}`;
+    }
+
+    /**
+     * Emails are written properly by the writer; notes, task names and descriptions are proofread.
+     * If the writer fails, the change goes ahead as Jo wrote it.
+     */
+    async polish(name, args) {
+      if (!this.writer) return args;
+      const a = { ...args };
+      try {
+        if (MAIL_TOOLS.has(name)) {
+          if (this.written.has(String(a.body || "").trim())) return a;
+          const out = await this.writer.email({
+            to: a.to, cc: a.cc, subject: a.subject, body: a.body, request: this.request, context: this.context,
+            original: a.message_id ? this.readMails.get(String(a.message_id)) || "" : "", reply: !!a.message_id,
+          });
+          if (out.question) return { question: out.question };
+          a.subject = out.subject || a.subject;
+          a.body = out.body;
+          a.writtenBy = this.writer.lastEngine;
+          this.written.add(a.body.trim());
+          return a;
+        }
+        const fields = PROOFREAD[name] || [];
+        await Promise.all(fields.filter((f) => a[f]).map(async (f) => { a[f] = await this.writer.proofread(a[f]); }));
+      } catch (e) {
+        console.warn("writing step skipped:", e.message);
+      }
+      return a;
+    }
+
+    /** The user edited the waiting email in its card: use their words exactly. */
+    editPending(fields) {
+      if (!this.pending) return;
+      Object.assign(this.pending.args, fields);
+      if (fields.body) this.written.add(String(fields.body).trim());
+      this.pending.summary = this.summarize(this.pending.name, this.pending.args);
+    }
+
+    /** Turns a waiting email into a send or a draft (the buttons on its card). */
+    switchPending(to) {
+      const p = this.pending;
+      if (!p || !MAIL_TOOLS.has(p.name)) return;
+      p.name = to === "draft" ? "save_draft" : p.args.message_id ? "reply_email" : "send_email";
+      p.summary = this.summarize(p.name, p.args);
     }
 
     summarize(name, a) {
@@ -1268,7 +1347,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
           await z.call("mail_send", { to: a.to, cc: a.cc || "", subject: a.subject || "", content: a.body, draft: true, ...(a.message_id ? { replyTo: a.message_id } : {}) });
           return "Saved in your Zoho Mail Drafts. It has not been sent.";
         case "reply_email":
-          await z.call("mail_send", { to: a.to, subject: a.subject || "Re:", content: a.body, replyTo: a.message_id });
+          await z.call("mail_send", { to: a.to, cc: a.cc || "", subject: a.subject || "Re:", content: a.body, replyTo: a.message_id });
           return `Reply sent to ${a.to}.`;
         case "crm_create_lead":
           await z.call("crm_create", { module: "Leads", fields: {
@@ -1465,6 +1544,138 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     }
   }
 
+  // ---------- writer: emails and notes, written properly ----------
+  // Jo's quick model answers questions; emails get their own writing step with a stronger model and
+  // proper instructions. Gemini (free, the same key) by default; ChatGPT or Claude with their own
+  // API key, falling back to Gemini if they fail. Small texts (notes, task names) are only proofread.
+  const CLAUDE_MODEL = "claude-opus-5-5", OPENAI_MODEL = "gpt-5";
+  const WRITER_ENGINES = { gemini: "Gemini", openai: "ChatGPT", claude: "Claude" };
+
+  class Writer {
+    constructor({ gemini = null, engine = "gemini", openaiKey = "", openaiModel = "", claudeKey = "", userName = "", tamil = false, http = defaultHttp } = {}) {
+      Object.assign(this, { gemini, engine, openaiKey: openaiKey.trim(), openaiModel: openaiModel.trim() || OPENAI_MODEL, claudeKey: claudeKey.trim(), userName, tamil, http });
+      this.lastEngine = "";
+    }
+    get name() { return WRITER_ENGINES[this.usable()] || "Gemini"; }
+    usable() {
+      if (this.engine === "openai" && this.openaiKey) return "openai";
+      if (this.engine === "claude" && this.claudeKey) return "claude";
+      return "gemini";
+    }
+
+    /** One piece of writing from the chosen engine; Gemini if that one fails. */
+    async complete(system, prompt, { quick = false } = {}) {
+      const engine = quick ? "gemini" : this.usable();
+      try {
+        const text = engine === "openai" ? await this.openai(system, prompt) : engine === "claude" ? await this.claude(system, prompt) : await this.viaGemini(system, prompt, quick);
+        this.lastEngine = WRITER_ENGINES[engine];
+        return text;
+      } catch (e) {
+        if (engine === "gemini") throw e;
+        console.warn(`${WRITER_ENGINES[engine]} writing failed, using Gemini:`, e.message);
+        this.lastEngine = "Gemini";
+        return await this.viaGemini(system, prompt, quick);
+      }
+    }
+    async viaGemini(system, prompt, quick) {
+      if (!this.gemini) throw new Error("No Gemini key.");
+      const json = await this.gemini.request(
+        { systemInstruction: { parts: [{ text: system }] }, contents: [Gemini.userText(prompt)] },
+        { models: quick ? [FALLBACK_MODEL, DEFAULT_MODEL] : [DEFAULT_MODEL, FALLBACK_MODEL] },
+      );
+      return Gemini.text(Gemini.parse(json));
+    }
+    async openai(system, prompt) {
+      const res = await this.http("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.openaiKey}` },
+        body: JSON.stringify({ model: this.openaiModel, messages: [{ role: "system", content: system }, { role: "user", content: prompt }] }),
+      });
+      if (!res.ok) throw new Error(`ChatGPT ${res.status}: ${String(await readError(res)).slice(0, 200)}`);
+      const text = (await res.json()).choices?.[0]?.message?.content;
+      if (!text) throw new Error("ChatGPT gave no text.");
+      return String(text).trim();
+    }
+    async claude(system, prompt) {
+      const res = await this.http("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.claudeKey,
+          "anthropic-version": "2026-10-21",
+          "anthropic-beta": "server-side-fallback-2026-07-01",
+          "anthropic-dangerous-direct-browser-access": "true", // the key is the user's own, kept in this browser
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL, max_tokens: 16000, system,
+          output_config: { effort: "low" }, // an email doesn't need long thinking, and low is quicker
+          fallbacks: "default",
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!res.ok) throw new Error(`Claude ${res.status}: ${String(await readError(res)).slice(0, 200)}`);
+      const json = await res.json();
+      if (json.stop_reason === "refusal") throw new Error("Claude declined this one.");
+      const text = (json.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+      if (!text) throw new Error("Claude gave no text.");
+      return text;
+    }
+
+    /**
+     * A finished email from Jo's rough version and the conversation. Returns { subject, body } or,
+     * when something essential is missing, { question } to ask the user instead.
+     */
+    async email({ to = "", cc = "", subject = "", body = "", request = "", context = "", original = "", reply = false }) {
+      const name = this.userName || "the sender";
+      const system = [
+        `You write emails for ${name}, who works at a company in Tamil Nadu, India, and sends them from Zoho Mail.`,
+        "Write the way a capable, warm professional does: a clear subject; a greeting with the person's name when it is known;",
+        "the purpose in the first sentence or two; short paragraphs; every fact the sender gave (names, amounts in rupees, dates,",
+        "order or invoice numbers) kept exactly; a clear next step or request when there is one; a polite closing line; and a",
+        `sign-off with ${name}'s name. Match the tone to the relationship: courteous and respectful with customers and seniors,`,
+        "friendly and direct with colleagues, firm but polite for payment follow-ups. Use Indian English. Correct all spelling and grammar.",
+        "Keep it as short as the purpose allows; no filler, no clichés, no markdown, no placeholders like [Name].",
+        "Never invent facts, figures, promises or dates the sender didn't give. If something essential is missing, so that the email",
+        "would be wrong or useless without it (for example the amount for a payment reminder, or which meeting to confirm), don't write",
+        "the email: ask one short question instead.",
+        reply ? "This is a reply: answer the original email's points, don't repeat it, and keep \"Re:\" with its subject." : "",
+        'Reply with JSON only: {"subject": "...", "body": "..."} or {"question": "..."}.',
+      ].filter(Boolean).join("\n");
+      const prompt = [
+        request ? `What the sender asked for: ${request}` : "",
+        context ? `The conversation so far:\n${context}` : "",
+        original ? `The email being answered:\n${clip(original, 4000)}` : "",
+        `To: ${to}${cc ? `\nCc: ${cc}` : ""}`,
+        subject ? `Subject idea: ${subject}` : "",
+        body ? `Rough draft:\n${body}` : "",
+      ].filter(Boolean).join("\n\n");
+      const out = Writer.json(await this.complete(system, prompt));
+      if (out.question) return { question: String(out.question) };
+      if (!out.body) throw new Error("The writer gave no email.");
+      return { subject: String(out.subject || subject || ""), body: String(out.body) };
+    }
+
+    /** The same text with spelling and grammar fixed; names, numbers and meaning unchanged. */
+    async proofread(text) {
+      const t = String(text ?? "").trim();
+      if (t.length < 3) return t;
+      const fixed = await this.complete([
+        "Correct the spelling, grammar and wording of the text you are given, as a careful editor would.",
+        "Keep the meaning, length and language. Keep every name, number, amount, date and code exactly as written.",
+        "Reply with only the corrected text: no quotes, notes or explanations.",
+      ].join("\n"), t, { quick: true });
+      const clean = fixed.replace(/^["'“]+|["'”]+$/g, "").trim();
+      // A reply that changed the length a lot is probably not just a correction: keep the original.
+      return clean && clean.length < t.length * 2 + 20 && clean.length > t.length / 2 ? clean : t;
+    }
+
+    static json(text) {
+      const m = /\{[\s\S]*\}/.exec(String(text).replace(/```(?:json)?/g, ""));
+      if (!m) throw new Error("The writer's answer wasn't readable.");
+      return JSON.parse(m[0]);
+    }
+  }
+
   // ---------- agent ----------
   // The conversation is kept so follow-ups ("and his phone number?", "assign that to Ravi") make sense.
   // The latest exchanges keep their lookups; older ones keep only what was said, so they stay small.
@@ -1504,6 +1715,11 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         "The user speaks, and speech recognition makes mistakes, especially with names and Indian pronunciation. Read their words",
         "for what they most likely meant. If a name finds nothing, try similar-sounding spellings (for example in crm_search) before",
         "saying it doesn't exist, and if you are unsure which person or record they mean, ask a short question.",
+        "If anything you need is unclear or missing (which person or record, an email address, a date, an amount, or what exactly to do),",
+        "ask one short question before acting instead of guessing. When several people or records match, name them briefly and ask which.",
+        "Don't ask about what you can look up yourself, and don't ask more than one question at a time.",
+        "For emails, put the user's points in body as a rough draft: the app has the email written properly and shows it to the user.",
+        "If a function answers NOT DONE with a question, ask the user that question.",
         "When the user corrects you (\"no, I said…\", \"not Ravi, Ravi Kumar\", \"change the date to Friday\", \"add Suresh in cc\"), apply the",
         "correction to their previous request or to the waiting change, keep everything else the same, and propose it again.",
         "If the correction is about a misheard word or name (not a change of mind), also call remember_correction, so it is",
@@ -1580,6 +1796,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         const waiting = this.tools.cancel();
         prompt = `[This change was waiting for my yes: ${waiting.summary} It has NOT been done. If my reply corrects or changes it, propose the corrected change again; otherwise drop it.]\n${text}`;
       }
+      this.tools.request = text;
+      this.tools.context = this.recentText(6);
       this.contents.push(Gemini.userText(`[Now: ${this.now()}]\n${prompt}`));
       // "search …", "google …", "look up …": go straight to the web search.
       const forceSearch = WEB_WORDS.test(text) && !OWN_DATA_WORDS.test(text) && this.tools.functions.some((f) => f.name === "web_search");
@@ -1667,7 +1885,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     return found.sort((a, b) => a.index - b.index).slice(0, max).map(({ value, label }) => ({ value, label }));
   }
 
-  const api = { SpeechMemory, wordFixes, encodeWav, isYes, isNo, extractFigures, matchWake, DEFAULT_TTS_MODEL, GEMINI_VOICES, describeMail, DEFAULT_MODEL, FALLBACK_MODEL, Gemini, Bridge, Tools, Agent, WRITE_TOOLS, parseLocal, formatTime, formatClock, isoDate, isoLocal, calTime, startOfToday, stripHtml };
+  const api = { Writer, WRITER_ENGINES, CLAUDE_MODEL, MAIL_TOOLS, SpeechMemory, wordFixes, encodeWav, isYes, isNo, extractFigures, matchWake, DEFAULT_TTS_MODEL, GEMINI_VOICES, describeMail, DEFAULT_MODEL, FALLBACK_MODEL, Gemini, Bridge, Tools, Agent, WRITE_TOOLS, parseLocal, formatTime, formatClock, isoDate, isoLocal, calTime, startOfToday, stripHtml };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.JoCore = api;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -1678,7 +1896,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 /* Jo Office UI: wires the HUD to JoCore (voice, panels, settings, brief and confirmations). */
 (function () {
   "use strict";
-  const { SpeechMemory, wordFixes, extractFigures, matchWake, Gemini, Bridge, Tools, Agent, DEFAULT_MODEL, DEFAULT_TTS_MODEL, GEMINI_VOICES, formatTime, isoDate, startOfToday } = window.JoCore;
+  const { SpeechMemory, wordFixes, extractFigures, matchWake, Gemini, Bridge, Tools, Agent, Writer, DEFAULT_MODEL, DEFAULT_TTS_MODEL, GEMINI_VOICES, formatTime, isoDate, startOfToday } = window.JoCore;
   const formatAgo = (ms) => {
     const min = Math.round((Date.now() - ms) / 60000);
     if (min < 1) return "just now";
@@ -1701,7 +1919,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     userName: "", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
     tamil: false, speak: true,
     voiceEngine: "gemini", fastVoice: true, geminiVoiceEn: "Charon", geminiVoiceTa: "Kore", pcVoiceEn: "", pcVoiceTa: "", ttsModel: "",
-    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, voiceReview: true, geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
+    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, voiceReview: true, writerEngine: "gemini", openaiKey: "", openaiModel: "", claudeKey: "", geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
@@ -1726,12 +1944,17 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     }
     return bridgeConn;
   }
+  /** Writes emails (Gemini, or ChatGPT / Claude with their own key) and proofreads notes and tasks. */
+  function makeWriter(gemini = new Gemini(settings.geminiKey, settings.geminiModel)) {
+    return new Writer({ gemini, engine: settings.writerEngine, openaiKey: settings.openaiKey, openaiModel: settings.openaiModel, claudeKey: settings.claudeKey, userName: settings.userName, tamil: settings.tamil });
+  }
   function getAgent() {
     if (!settings.geminiKey) return null;
     if (!agent) {
       const gemini = new Gemini(settings.geminiKey, settings.geminiModel);
       const tools = buildTools();
       tools.search = gemini; // web search uses the same Gemini key
+      tools.writer = makeWriter(gemini);
       agent = new Agent(gemini, tools, settings.tamil, settings.userName, savedHistory().contents);
     }
     return agent;
@@ -1792,7 +2015,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       opts.stats?.data ? `data ${opts.stats.data.toFixed(1)} s` : "",
     ].filter(Boolean).join(" · ");
     div.innerHTML = `<div class="who">${who === "me" ? "You" : "Jo Office"}</div><div class="bubble${settings.tamil ? " ta" : ""}">${esc(text)}</div>${
-      opts.cards?.length ? renderCards(opts.cards) : ""}${opts.confirm ? confirmCard(opts.confirm) : ""}${
+      opts.cards?.length ? renderCards(opts.cards) : ""}${opts.confirm ? confirmCard(opts.confirm, opts.pending) : ""}${
       meta ? `<div class="tools">${esc(meta)}</div>` : ""}`;
     // Your own words: click to fix a misheard word and send again.
     if (who === "me") {
@@ -1849,13 +2072,37 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       <div class="r"><span class="name">${esc(e.title)}${e.location ? ` <small class="date">· ${esc(e.location)}</small>` : ""}</span><span></span><span class="date">${esc(when(e))}</span>${link(e.link, "Open ↗")}</div>`).join("")}</div></div>`;
   }
   /** Buttons under a change that waits for "yes"; they answer just like saying it. */
-  function confirmCard(name) {
+  function confirmCard(name, pending) {
+    if (pending && /^(send_email|reply_email|save_draft)$/.test(name)) return mailEditCard(name, pending.args || {});
     const mail = name === "send_email" || name === "reply_email";
     const buttons = mail ? [["Yes, send", "Yes", true], ["Save as draft", "No, save it as a draft instead"], ["Cancel", "No"]]
       : name === "save_draft" ? [["Yes, save draft", "Yes", true], ["Send instead", "Don't save a draft, send it now instead"], ["Cancel", "No"]]
       : [["Yes, do it", "Yes", true], ["Cancel", "No"]];
     return `<div class="card confirm-card"><div class="what">Waiting for your yes. Nothing has been changed yet.</div><div class="btns">${
       buttons.map(([label, say, main]) => `<button class="btn${main ? " primary" : ""}" data-ask="${esc(say)}">${esc(label)}</button>`).join("")}</div></div>`;
+  }
+
+  /** A waiting email, shown in full and editable. The buttons use what's in the boxes. */
+  function mailEditCard(name, a) {
+    const draft = name === "save_draft";
+    const field = (f, label, v) => `<label><span>${label}</span><input data-f="${f}" value="${esc(v || "")}" spellcheck="false"></label>`;
+    const lines = Math.min(18, Math.max(6, String(a.body || "").split("\n").length + 2));
+    const buttons = draft
+      ? [["Yes, save draft", "draft", true], ["Send instead", "send"], ["Cancel", "cancel"]]
+      : [["Yes, send", "send", true], ["Save as draft", "draft"], ["Cancel", "cancel"]];
+    return `<div class="card confirm-card mail-edit">
+      <div class="what">${draft ? "Draft email" : a.message_id ? "Reply" : "Email"} · written by ${esc(a.writtenBy || "Jo")} · edit anything, then choose. Nothing is sent yet.</div>
+      ${field("to", "To", a.to)}${field("cc", "Cc", a.cc)}${field("subject", "Subject", a.subject)}
+      <textarea data-f="body" rows="${lines}">${esc(a.body || "")}</textarea>
+      <div class="btns">${buttons.map(([label, act, main]) => `<button class="btn${main ? " primary" : ""}" data-act="${act}">${esc(label)}</button>`).join("")}</div></div>`;
+  }
+  /** Copies what's in a waiting email's boxes into the change, so a spoken "yes" also uses your edits. */
+  function syncMailCard() {
+    const card = transcript.querySelector(".mail-edit");
+    if (!card || !agent?.tools.pending) return;
+    const fields = {};
+    card.querySelectorAll("[data-f]").forEach((el) => { fields[el.dataset.f] = el.value.trim(); });
+    agent.tools.editPending(fields);
   }
 
   // ---------- speech out ----------
@@ -2348,6 +2595,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     text = text.trim();
     followUpPending = false;
     if (!text || busy) return;
+    syncMailCard();
     addMsg("me", text, { voice });
     const a = getAgent();
     if (!a) { addMsg("jo", "Please add your Gemini API key in Settings first.", { error: true }); openSettings(); return; }
@@ -2356,7 +2604,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     const used = [], t0 = performance.now();
     try {
       const reply = await a.ask(text, (tool) => { used.push(tool); setState("thinking", TOOL_LABELS[tool] || "PROCESSING…"); });
-      addMsg("jo", reply, { tools: used, stats: a.lastStats || { think: (performance.now() - t0) / 1000, data: 0 }, confirm: a.tools.pending?.name, cards: a.tools.sources });
+      addMsg("jo", reply, { tools: used, stats: a.lastStats || { think: (performance.now() - t0) / 1000, data: 0 }, confirm: a.tools.pending?.name, pending: a.tools.pending, cards: a.tools.sources });
       if (!a.tools.pending) document.querySelectorAll(".msg .confirm-card").forEach((c) => c.remove());
       showOnStage(reply);
       $("hud-latency").textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s`;
@@ -2617,6 +2865,14 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         case "gemini":
           result = Gemini.text(await new Gemini(settings.geminiKey, settings.geminiModel).generate("Reply in under ten words.", [Gemini.userText(`Say hello to ${userName()}.`)]));
           setHealth("gemini", "ok"); break;
+        case "writer": {
+          const w = makeWriter();
+          if (settings.writerEngine === "openai" && !settings.openaiKey) throw new Error("Add your OpenAI API key first, or choose Gemini.");
+          if (settings.writerEngine === "claude" && !settings.claudeKey) throw new Error("Add your Claude API key first, or choose Gemini.");
+          const engine = w.usable();
+          const said = engine === "openai" ? await w.openai("Reply in under ten words.", "Say hello.") : engine === "claude" ? await w.claude("Reply in under ten words.", "Say hello.") : await w.viaGemini("Reply in under ten words.", "Say hello.");
+          result = `${w.name} is writing your emails. It said: ${said}`; break;
+        }
         case "bridge": {
           if (!tools.bridge) throw new Error("Fill in the bridge URL and key first.");
           // One check per Zoho app, so a missing scope shows exactly where.
@@ -2721,6 +2977,13 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   transcript.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-ask]");
     if (b) { b.closest(".confirm-card")?.remove(); ask(b.dataset.ask); }
+    const act = e.target.closest("button[data-act]");
+    if (act && agent?.tools.pending) {
+      syncMailCard();
+      if (act.dataset.act !== "cancel") agent.tools.switchPending(act.dataset.act);
+      act.closest(".confirm-card")?.remove();
+      ask(act.dataset.act === "cancel" ? "No" : "Yes");
+    }
   });
   $("refresh-team").addEventListener("click", () => renderTeam(true));
   $("team").addEventListener("click", (e) => {
