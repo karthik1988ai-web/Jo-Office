@@ -233,6 +233,10 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 .mail-edit textarea { display: block; margin: 8px 0 10px; line-height: 1.5; resize: vertical; }
 .mail-edit input:focus, .mail-edit textarea:focus { border-color: var(--acc); }
 
+/* Jo isn't sure which one you mean: the options as buttons */
+.choice-card { border-color: var(--acc); }
+.choice-card .what { margin-bottom: 8px; color: var(--text); font-weight: 600; }
+
 </style>
 </head>
 <body>
@@ -432,6 +436,142 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 
 <div class="toast" id="toast" hidden></div>
 
+<script>
+/* jo-android.js */
+/*
+ * Jo inside the Android app. Android's WebView has no speech recognition, no PC voices, no web
+ * notifications and no page full screen, so this file supplies them from the phone through the
+ * JoNative channel (phone/src/main/java/com/karthik/jo/phone/NativeBridge.kt). In a normal
+ * browser JoNative doesn't exist and this file does nothing.
+ */
+(function () {
+  "use strict";
+  const N = window.JoNative;
+  if (!N) return;
+  window.JoApp = true;
+
+  const send = (m) => N.postMessage(JSON.stringify(m));
+  const handlers = {};
+  N.onmessage = (e) => {
+    let m;
+    try { m = JSON.parse(e.data); } catch { return; }
+    const h = handlers[m.t];
+    if (h) h(m);
+  };
+  let seq = 0;
+  const nextId = () => String(++seq);
+
+  // ---------- speech recognition (the phone's recognizer) ----------
+  const recs = new Map();
+  class PhoneRecognition {
+    constructor() {
+      this.lang = ""; this.continuous = false; this.interimResults = false; this.maxAlternatives = 1;
+      this.onstart = this.onresult = this.onerror = this.onend = null;
+      this._id = null; this._results = [];
+    }
+    start() {
+      if (this._id) throw new DOMException("Recognition has already started.", "InvalidStateError");
+      this._id = nextId(); this._results = [];
+      recs.set(this._id, this);
+      send({ t: "rec.start", id: this._id, lang: this.lang || navigator.language, continuous: !!this.continuous, interim: !!this.interimResults });
+    }
+    stop() { if (this._id) send({ t: "rec.stop", id: this._id }); }
+    abort() { if (this._id) send({ t: "rec.abort", id: this._id }); }
+  }
+  handlers["rec.start"] = (m) => { const r = recs.get(m.id); if (r && r.onstart) r.onstart({}); };
+  handlers["rec.result"] = (m) => {
+    const r = recs.get(m.id); if (!r) return;
+    const res = [{ transcript: m.text, confidence: m.final ? 0.9 : 0 }];
+    res.isFinal = !!m.final;
+    const list = r._results, last = list[list.length - 1];
+    // Like Chrome: a phrase's in-progress words are replaced until the phrase is final.
+    const index = last && !last.isFinal ? list.length - 1 : list.length;
+    list[index] = res;
+    if (r.onresult && (m.final || r.interimResults)) r.onresult({ resultIndex: index, results: list });
+  };
+  handlers["rec.error"] = (m) => { const r = recs.get(m.id); if (r && r.onerror) r.onerror({ error: m.error, message: m.message || "" }); };
+  handlers["rec.end"] = (m) => {
+    const r = recs.get(m.id); if (!r) return;
+    recs.delete(m.id); r._id = null;
+    if (r.onend) r.onend({});
+  };
+  window.SpeechRecognition = window.webkitSpeechRecognition = PhoneRecognition;
+
+  // ---------- text to speech (the phone's voices) ----------
+  let voices = [];
+  const voiceListeners = [];
+  const queue = [];
+  let current = null;
+  class PhoneUtterance {
+    constructor(text) {
+      this.text = text || ""; this.lang = ""; this.voice = null; this.rate = 1; this.pitch = 1; this.volume = 1;
+      this.onstart = this.onend = this.onerror = null;
+    }
+  }
+  const synth = {
+    speaking: false, pending: false, paused: false, onvoiceschanged: null,
+    getVoices: () => voices.slice(),
+    speak(u) { queue.push(u); pump(); },
+    cancel() {
+      queue.length = 0;
+      if (!current) return;
+      const u = current; current = null; synth.speaking = false;
+      send({ t: "tts.cancel" });
+      if (u.onend) u.onend({});
+    },
+    pause() {}, resume() {},
+    addEventListener(type, fn) { if (type === "voiceschanged") voiceListeners.push(fn); },
+    removeEventListener(type, fn) { const i = voiceListeners.indexOf(fn); if (i >= 0) voiceListeners.splice(i, 1); },
+  };
+  function pump() {
+    if (current || !queue.length) return;
+    current = queue.shift();
+    current._id = nextId();
+    synth.speaking = true;
+    send({ t: "tts.speak", id: current._id, text: current.text, lang: current.lang || (current.voice && current.voice.lang) || "",
+      voice: (current.voice && current.voice.name) || "", rate: current.rate || 1 });
+  }
+  function finish(m, failed) {
+    if (!current || current._id !== m.id) return;
+    const u = current; current = null; synth.speaking = false;
+    if (failed && u.onerror) u.onerror({ error: "synthesis-failed" });
+    else if (u.onend) u.onend({});
+    pump();
+  }
+  handlers["tts.start"] = (m) => { if (current && current._id === m.id && current.onstart) current.onstart({}); };
+  handlers["tts.end"] = (m) => finish(m, false);
+  handlers["tts.error"] = (m) => finish(m, true);
+  handlers["tts.voices"] = (m) => {
+    voices = (m.voices || []).map((v) => ({ name: v.name, lang: v.lang, voiceURI: v.name, localService: true, default: false }));
+    if (synth.onvoiceschanged) synth.onvoiceschanged({});
+    voiceListeners.forEach((fn) => fn({}));
+  };
+  Object.defineProperty(window, "speechSynthesis", { value: synth, configurable: true });
+  window.SpeechSynthesisUtterance = PhoneUtterance;
+
+  // ---------- notifications ----------
+  class PhoneNotification {
+    constructor(title, opts) { this.onclick = null; send({ t: "notify", title: String(title), body: String((opts && opts.body) || "") }); }
+    close() {}
+    static get permission() { return "granted"; } // the phone asks once when Jo starts
+    static requestPermission() { send({ t: "notify.permission" }); return Promise.resolve("granted"); }
+  }
+  window.Notification = PhoneNotification;
+
+  // ---------- full screen (hides the phone's status and navigation bars) ----------
+  let full = false;
+  Object.defineProperty(document, "fullscreenElement", { get: () => (full ? document.documentElement : null), configurable: true });
+  Element.prototype.requestFullscreen = function () { send({ t: "fullscreen", on: true }); return Promise.resolve(); };
+  document.exitFullscreen = function () { send({ t: "fullscreen", on: false }); return Promise.resolve(); };
+  handlers["fullscreen"] = (m) => { full = !!m.on; document.dispatchEvent(new Event("fullscreenchange")); };
+
+  // ---------- opened by the assistant gesture or "Talk to Jo" shortcut ----------
+  handlers["listen"] = () => { window.JoListenRequested = true; window.dispatchEvent(new Event("jo-listen")); };
+
+  send({ t: "hello" });
+})();
+
+</script>
 <script>
 /* jo-wave.js */
 /*
@@ -964,10 +1104,19 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   }
   const rupees = (n) => `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
   // Zoho CRM tab names in record links (Deals are "Potentials" there).
-  const CRM_TABS = { Deals: "Potentials", Leads: "Leads", Contacts: "Contacts", Accounts: "Accounts", Tasks: "Tasks", Events: "Events", Calls: "Calls" };
+  const CRM_TABS = { Deals: "Potentials", Products: "Products", Leads: "Leads", Contacts: "Contacts", Accounts: "Accounts", Tasks: "Tasks", Events: "Events", Calls: "Calls" };
   const crmLink = (base, module, id) => (base && id ? `${base}/${CRM_TABS[module] || module}/${id}` : "");
+  /** A record's name plus its company, so two Ravis can be told apart: "Ravi Kumar (Acme Traders)". */
+  const recordLabel = (r) => {
+    const name = recordName(r), firm = typeof r.Account_Name === "string" ? r.Account_Name : r.Account_Name?.name || r.Company || "";
+    return firm && firm !== name ? `${name} (${firm})` : name;
+  };
+  // Words that say nothing about which record is meant.
+  const NOT_NAMES = new Set("the and for with from into about this that please task tasks deal deals note notes add give make change update set move date due new mark call meeting customer account contact lead record send email mail to of in on at my our his her their".split(" "));
+  const keyWords = (s) => String(s || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2 && !NOT_NAMES.has(w))
+    .map((w) => (w.length > 4 ? w.replace(/(ing|ed|es|s)$/, "") : w));
   /** A record's display name, whichever module it comes from. */
-  const recordName = (r) => r.Deal_Name || r.Full_Name || [r.First_Name, r.Last_Name].filter(Boolean).join(" ") || r.Subject || r.Event_Title
+  const recordName = (r) => r.Deal_Name || r.Product_Name || r.Full_Name || [r.First_Name, r.Last_Name].filter(Boolean).join(" ") || r.Subject || r.Event_Title
     || (typeof r.Account_Name === "string" ? r.Account_Name : r.Account_Name?.name) || r.Company || r.name || "(no name)";
   const dateOnly = (text) => {
     const m = /^\d{4}-\d{2}-\d{2}/.exec(String(text || "").trim());
@@ -982,14 +1131,15 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     if (Object.keys(params).length) {
       d.parameters = {
         type: "object",
-        properties: Object.fromEntries(Object.entries(params).map(([k, [type, desc]]) => [k, { type, description: desc }])),
+        properties: Object.fromEntries(Object.entries(params).map(([k, p]) => [k, Array.isArray(p) ? { type: p[0], description: p[1] } : p])),
         ...(required.length ? { required } : {}),
       };
     }
     return d;
   };
 
-  const MODULE = ["string", "Leads, Contacts, Accounts, Deals, Tasks, Events or Calls"];
+  const MODULE = ["string", "Leads, Contacts, Accounts, Deals, Products, Tasks, Events or Calls"];
+  const crmModuleName = (m) => ["Leads", "Contacts", "Accounts", "Deals", "Products", "Tasks", "Events", "Calls"].find((x) => x.toLowerCase() === String(m || "").toLowerCase() || x.toLowerCase() === `${String(m || "").toLowerCase()}s`) || String(m || "");
   const FUNCTIONS = [
     fn("remember_correction", "Save a speech-recognition fix for next time, when the user says you misheard them (\"no, I said Murugan\", \"it's Sri Balaji, not Sree Bal Ajee\"). Use the misheard words exactly as they appeared in the user's earlier message.",
       { heard: ["string", "The words as they were misheard, e.g. murukan"], meant: ["string", "What the user actually said, e.g. Murugan"] }, ["heard", "meant"]),
@@ -1023,7 +1173,18 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     fn("crm_search", "Find Zoho CRM records by a word (name, company, email, phone).",
       { module: MODULE, word: ["string", "Search word"], limit: ["integer", "Default 10"] }, ["module", "word"]),
     fn("crm_get_record", "Full details of one CRM record.", { module: MODULE, record_id: ["string", "id from a search"] }, ["module", "record_id"]),
-    fn("crm_query", "Read Zoho CRM with a COQL select query, e.g. select Deal_Name, Amount, Stage from Deals where Closing_Date between '2026-10-01' and '2026-10-31' limit 50. A where clause is required. Read-only.",
+    fn("crm_find", "List or count Zoho CRM records that match conditions, exactly. Use this for any request with conditions (a name starting with something, a stage, a status, an amount, a date range). One condition per requirement; all must match.", {
+      module: MODULE,
+      conditions: { type: "array", description: "Every condition the user gave", items: { type: "object", properties: {
+        field: { type: "string", description: "Zoho API field name, e.g. Deal_Name, Stage, Amount, Closing_Date, Account_Name, Lead_Status, Status, Due_Date, Company" },
+        op: { type: "string", description: "equals, not_equals, starts_with, contains, in, greater_than, less_than, between, is_empty or is_not_empty" },
+        value: { type: "string", description: "The value as the user said it (the app finds the exact value in Zoho); for in, comma separated; dates as YYYY-MM-DD" },
+        value2: { type: "string", description: "Second value, for between" },
+      }, required: ["field", "op"] } },
+      sort_by: ["string", "Optional field to sort by"], sort_order: ["string", "asc or desc"],
+      limit: ["integer", "How many at most, default 200"],
+    }, ["module", "conditions"]),
+    fn("crm_query", "Read Zoho CRM with your own COQL select query, only when crm_find can't express it (e.g. or conditions). A where clause is required; at most two conditions per bracket. Read-only.",
       { query: ["string", "One COQL select statement"] }, ["query"]),
     fn("crm_my_tasks", "The user's open Zoho CRM tasks with due dates."),
     fn("crm_meetings", "Meetings logged in Zoho CRM (Events, linked to customers) from today for the given days. For the user's own schedule use calendar_events.", { days: ["integer", "1 = today, 7 = this week. Default 1"] }),
@@ -1051,6 +1212,13 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       module: MODULE, record_id: ["string", "id from a search"],
       fields_json: ["string", 'JSON object of field changes, e.g. {"Stage":"Negotiation/Review","Amount":250000}'],
     }, ["module", "record_id", "fields_json"]),
+    fn("crm_update_task", "Change a Zoho CRM task: its due date, wording (subject), details, priority, status, or who does it. Find the task first (crm_my_tasks, team_tasks or crm_find on Tasks) to get its id. Only pass what changes. Needs the user's confirmation.", {
+      task_id: ["string", "The task's id"], subject_now: ["string", "The task's current subject, for the confirmation"],
+      new_subject: ["string", "Optional: the new wording"], due_date: ["string", "Optional: new due date, YYYY-MM-DD"],
+      description: ["string", "Optional: new details (replaces the old ones)"], priority: ["string", "Optional: Highest, High, Normal, Low or Lowest"],
+      status: ["string", "Optional: Not Started, In Progress, Waiting for input, Deferred or Completed"],
+      assign_to: ["string", "Optional: the team member's name who should do it now"],
+    }, ["task_id"]),
     fn("crm_complete_task", "Mark a CRM task as completed. Needs the user's confirmation.", { task_id: ["string", "id from crm_my_tasks"], subject: ["string", "The task's subject, for the confirmation"] }, ["task_id"]),
 
     // Zoho Expense
@@ -1078,9 +1246,9 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   // Text fields that are proofread before they're saved in Zoho.
   const PROOFREAD = {
     crm_add_note: ["content"], crm_create_task: ["subject", "description"], crm_create_lead: ["description"],
-    crm_create_meeting: ["title"], add_expense: ["description"], calendar_add_event: ["title", "description"],
+    crm_create_meeting: ["title"], crm_update_task: ["new_subject", "description"], add_expense: ["description"], calendar_add_event: ["title", "description"],
   };
-  const WRITE_TOOLS = new Set(["send_email", "reply_email", "save_draft", "crm_create_lead", "crm_add_note", "crm_create_task", "crm_create_meeting",
+  const WRITE_TOOLS = new Set(["crm_update_task", "send_email", "reply_email", "save_draft", "crm_create_lead", "crm_add_note", "crm_create_task", "crm_create_meeting",
     "crm_update_record", "crm_complete_task", "add_expense", "calendar_add_event"]);
   // A reply confirms or cancels only when it is nothing but that: "yes, but make it Friday" and
   // "no, the name is Ravi Kumar" are corrections, which go back to Gemini to propose again.
@@ -1110,6 +1278,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       this.request = ""; this.context = ""; // what the user just asked, and the conversation, for the writer
       this.readMails = new Map(); // messageId -> text of emails read in this conversation, for replies
       this.written = new Set(); // email bodies already written or edited by the user: not rewritten again
+      this.seen = new Map(); // record id -> the list it was found in, to check Jo picked the one the user meant
+      this.offered = new Set(); // ids the user was just asked to choose between
       this.pending = null; // { name, args, summary } waiting for the user's yes
       this.sources = []; // cards for the chat: the records behind this answer
     }
@@ -1210,6 +1380,24 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
             return records.length ? json(records) : "No matching CRM records.";
           }
           case "crm_get_record": return json((await z().call("crm_get", { module: args.module, id: args.record_id })).record, 8000);
+          case "crm_find": {
+            const conditions = Array.isArray(args.conditions) ? args.conditions : [];
+            let found;
+            try {
+              found = await z().call("crm_find", { module: args.module, conditions, sort_by: args.sort_by, sort_order: args.sort_order, limit: args.limit || 200 });
+            } catch (e) {
+              const m = /could mean several (\w+) values: (.+?)\. Ask/.exec(e.message);
+              if (m) this.offerChoice(`Which ${m[1].replace(/_/g, " ")}?`, m[2].split(", ").map((v) => `${m[1].replace(/_/g, " ")} ${v}`));
+              throw e;
+            }
+            const { records, crmUrl, resolved = [], limited } = found;
+            const said = (c) => `${String(c.field).replace(/_/g, " ")} ${String(c.op).replace(/_/g, " ")}${c.value !== undefined ? ` ${c.value}` : ""}${c.value2 !== undefined ? ` and ${c.value2}` : ""}`;
+            const fixed = new Map(resolved.map((r) => [`${r.field}|${r.asked}`, r.used]));
+            const tags = conditions.map((c) => said({ ...c, value: fixed.get(`${c.field}|${c.value}`) ?? c.value }));
+            const card = this.crmCard(crmModuleName(args.module), records, crmUrl, tags.length ? tags : ["all records"], limited ? records.length : (args.limit || 200));
+            const notes = resolved.map((r) => `"${r.asked}" means ${r.field.replace(/_/g, " ")} "${r.used}" in Zoho.`).join(" ");
+            return (records.length ? json(records, 10000) : "No records match all the conditions.") + (notes ? `\n${notes}` : "") + this.computed(card);
+          }
           case "crm_query": {
             const { records, crmUrl } = await z().call("crm_query", { query: args.query });
             const q = String(args.query || "");
@@ -1262,7 +1450,12 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       if (this.pending && this.pending.fresh) return "Only one change at a time. Ask the user to confirm the first one.";
       this.zoho();
       // A task for someone else: find who, before anything is read back.
-      if (name === "crm_create_task" && args.assign_to) args = { ...args, owner: await this.teamMember(args.assign_to) };
+      if ((name === "crm_create_task" || name === "crm_update_task") && args.assign_to) args = { ...args, owner: await this.teamMember(args.assign_to) };
+      if (name === "crm_update_task" && !["new_subject", "due_date", "description", "priority", "status", "assign_to"].some((k) => args[k])) {
+        return "NOT DONE. Nothing to change was given: ask the user what to change in the task.";
+      }
+      const recordId = args.task_id || args.record_id;
+      if (recordId) { const q = this.whichOne(recordId); if (q) return q; }
       args = await this.polish(name, args);
       if (args.question) return `NOT DONE. Something is missing. Ask the user exactly this, in one short sentence: ${args.question}`;
       const summary = this.summarize(name, args);
@@ -1331,6 +1524,14 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
           const fields = JSON.parse(a.fields_json || "{}");
           return `Update the ${a.module} record: ${Object.entries(fields).map(([k, v]) => `${k.replace(/_/g, " ")} to ${v}`).join(", ")}.`;
         }
+        case "crm_update_task": {
+          const changes = [
+            a.due_date && `due date to ${dateOnly(a.due_date)}`, a.new_subject && `wording to "${a.new_subject}"`,
+            a.description && `details to "${a.description}"`, a.priority && `priority to ${a.priority}`,
+            a.status && `status to ${a.status}`, a.owner && `give it to ${a.owner.name}`,
+          ].filter(Boolean);
+          return `Change the CRM task${a.subject_now ? ` "${a.subject_now}"` : ""}: ${changes.join(", ")}.`;
+        }
         case "crm_complete_task": return `Mark the CRM task ${a.subject ? `"${a.subject}" ` : ""}as completed.`;
         case "add_expense": return `Add an expense of ${money(a.amount)} for ${a.category}${a.merchant ? ` at ${a.merchant}` : ""} on ${a.date ? dateOnly(a.date) : "today"}${a.description ? `: ${a.description}` : ""}.`;
         case "calendar_add_event": {
@@ -1385,6 +1586,17 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         case "crm_update_record":
           await z.call("crm_update", { module: a.module, id: a.record_id, fields: JSON.parse(a.fields_json || "{}") });
           return "Updated in Zoho CRM.";
+        case "crm_update_task": {
+          const fields = {};
+          if (a.new_subject) fields.Subject = a.new_subject;
+          if (a.due_date) fields.Due_Date = dateOnly(a.due_date);
+          if (a.description) fields.Description = a.description;
+          if (a.priority) fields.Priority = a.priority;
+          if (a.status) fields.Status = a.status;
+          if (a.owner) fields.Owner = { id: a.owner.id };
+          await z.call("crm_update", { module: "Tasks", id: a.task_id, fields });
+          return `Task${a.subject_now ? ` "${a.subject_now}"` : ""} updated in Zoho CRM${a.owner ? ` and given to ${a.owner.name}` : ""}.`;
+        }
         case "crm_complete_task":
           await z.call("crm_update", { module: "Tasks", id: a.task_id, fields: { Status: "Completed" } });
           return "Task marked as completed.";
@@ -1438,6 +1650,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     async tasks(maxAgeMs = READ_MAX_AGE) {
       const { tasks = [], crmUrl = "" } = await this.read("crm_my_tasks", {}, maxAgeMs);
       this.lastCrmUrl = crmUrl; this.lastAt = Date.now();
+      this.noteSeen("Tasks", tasks, (t) => t.Subject || "(no subject)");
       return tasks.map((t) => ({
         id: String(t.id), title: t.Subject || "(no subject)", date: t.Due_Date || null,
         due: t.Due_Date ? parseLocal(t.Due_Date) : null, priority: t.Priority || "", status: t.Status || "",
@@ -1462,7 +1675,10 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       const ranked = team.map((u) => ({ u, s: score(u) })).filter((x) => x.s).sort((a, b) => b.s - a.s);
       if (!ranked.length) throw new Error(`No team member called "${name}" in Zoho CRM. The team is: ${team.map((u) => u.name).join(", ") || "nobody else"}. Ask who they meant.`);
       const best = ranked.filter((x) => x.s === ranked[0].s);
-      if (best.length > 1) throw new Error(`More than one team member matches "${name}": ${best.map((x) => x.u.name).join(", ")}. Ask which one.`);
+      if (best.length > 1) {
+        this.offerChoice(`Which ${name}?`, best.map((x) => x.u.name));
+        throw new Error(`More than one team member matches "${name}": ${best.map((x) => x.u.name).join(", ")}. Don't pick one: ask which one.`);
+      }
       const { id, name: full, email } = best[0].u;
       return { id, name: full, email };
     }
@@ -1533,7 +1749,40 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     }
 
     /** Builds the chat card for CRM records (and, when [show], adds it to this answer's cards). */
+    /** Notes the records Jo was shown together, so an action on one of them can be checked. */
+    noteSeen(module, rows, labelOf = recordLabel) {
+      const group = rows.filter((r) => r && r.id).map((r) => ({ id: String(r.id), label: labelOf(r) }));
+      for (const g of group) this.seen.set(g.id, { module, group });
+    }
+
+    /** Buttons that answer a question by tapping (or saying) one of the options. */
+    offerChoice(question, options) {
+      this.sources.push({ kind: "choice", question, options: options.slice(0, 8).map((label) => ({ label, say: `I mean ${label}` })) });
+    }
+
+    /**
+     * Before acting on a record: if it came from a list where other records fit the user's words just as
+     * well (two customers called Ravi, two DAC deals), don't guess. Returns a question, or "" when clear.
+     */
+    whichOne(id) {
+      const hit = this.seen.get(String(id || ""));
+      if (!hit || hit.group.length < 2) return "";
+      if (this.offered.has(String(id))) { this.offered.clear(); return ""; } // the user just chose it
+      const asked = new Set(keyWords(this.request));
+      const score = (g) => keyWords(g.label).filter((w) => asked.has(w)).length;
+      const ranked = hit.group.map((g) => ({ ...g, s: score(g) }));
+      const best = Math.max(...ranked.map((g) => g.s));
+      const top = ranked.filter((g) => g.s === best);
+      const chosen = ranked.find((g) => g.id === String(id));
+      if (best > 0 && top.length === 1 && chosen.s === best) return "";
+      const options = (best > 0 ? top : ranked).slice(0, 8);
+      this.offered = new Set(options.map((g) => g.id));
+      this.offerChoice(`Which one did you mean?`, options.map((g) => g.label));
+      return `NOT DONE. Several ${hit.module.toLowerCase()} could be the one the user means: ${options.map((g) => g.label).join("; ")}. Don't pick one yourself: ask the user which one, in one short question (they can also tap a button).`;
+    }
+
     crmCard(module, records = [], crmUrl = "", filters = [], limit = 200, title = "", show = true) {
+      this.noteSeen(module, records);
       const amounts = records.map((r) => Number(r.Amount ?? r.Grand_Total)).filter((n) => Number.isFinite(n));
       const card = {
         kind: "crm", title: title || `${module || "CRM"} records`, filters, at: Date.now(),
@@ -1715,10 +1964,14 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         "Changes (sending mail, creating or updating CRM records, expenses, calendar events) are never done straight away:",
         "the function answers NOT DONE YET, and you then read the change back briefly and ask the user to say yes or no.",
         "Never say a change is done until the user has confirmed it. Before writing an email, make sure you know the recipient's address.",
+        "To change a task (its date, wording, details, priority, status or who does it), find it first, then use crm_update_task.",
         "The user leads a team. To give someone a task, use crm_create_task with assign_to (their name); to follow up, use",
         "team_tasks (everyone, or one person); to chase someone, send_email to their address from team_members.",
         "To write an email the user wants to check first, or when they say \"save it as a draft\" instead of yes, use save_draft",
         "(with message_id for a reply). It goes to Zoho Mail Drafts and is not sent.",
+        "For CRM questions with conditions (\"deals starting with DAC that are Closed Won\"), use crm_find with one condition for each part of",
+        "the request, and answer only from what it returns: never show or count records that don't meet every condition, and never",
+        "replace a filtered search with crm_search. If crm_find gives an error, correct the condition from what the error says, or ask the user.",
         "Never add up amounts or count records yourself: when a result says \"Computed by the app\", say exactly those figures.",
         "The records behind your answer are shown to the user as a card, so speak a short summary instead of reading every record.",
         "For anything current or outside the user's Zoho data, use web_search and name the main source in a few words.",
@@ -1726,6 +1979,10 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         "The user speaks, and speech recognition makes mistakes, especially with names and Indian pronunciation. Read their words",
         "for what they most likely meant. If a name finds nothing, try similar-sounding spellings (for example in crm_search) before",
         "saying it doesn't exist, and if you are unsure which person or record they mean, ask a short question.",
+        "Never guess. If a name matches more than one customer, contact, deal, product or team member, don't pick one: name them briefly",
+        "(with their company) and ask which one. If nothing matches, try one similar spelling, then ask; never act on a record you haven't found.",
+        "Products are in the Products module (crm_search or crm_find with Product_Name); if the product isn't clear, ask.",
+        "When a function answers NOT DONE with a question, ask the user exactly that and wait.",
         "If anything you need is unclear or missing (which person or record, an email address, a date, an amount, or what exactly to do),",
         "ask one short question before acting instead of guessing. When several people or records match, name them briefly and ask which.",
         "Don't ask about what you can look up yourself, and don't ask more than one question at a time.",
@@ -1985,9 +2242,9 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   const TOOL_LABELS = {
     get_unread_mail: "CHECKING MAIL", search_mail: "SEARCHING MAIL", read_mail: "READING MAIL",
     send_email: "SENDING MAIL", reply_email: "SENDING REPLY", save_draft: "SAVING DRAFT",
-    crm_search: "SEARCHING CRM", crm_get_record: "READING CRM", crm_query: "QUERYING CRM", crm_my_tasks: "CHECKING TASKS",
+    crm_search: "SEARCHING CRM", crm_get_record: "READING CRM", crm_query: "QUERYING CRM", crm_find: "FILTERING CRM", list_mail_folders: "CHECKING FOLDERS", crm_my_tasks: "CHECKING TASKS",
     crm_meetings: "CHECKING MEETINGS", crm_pipeline: "CHECKING PIPELINE", crm_create_lead: "CREATING LEAD", crm_add_note: "ADDING NOTE",
-    crm_create_task: "CREATING TASK", team_members: "CHECKING TEAM", team_tasks: "CHECKING TEAM TASKS", crm_create_meeting: "ADDING MEETING", crm_update_record: "UPDATING CRM", crm_complete_task: "UPDATING TASK",
+    crm_create_task: "CREATING TASK", team_members: "CHECKING TEAM", team_tasks: "CHECKING TEAM TASKS", crm_create_meeting: "ADDING MEETING", crm_update_record: "UPDATING CRM", crm_complete_task: "UPDATING TASK", crm_update_task: "UPDATING TASK",
     expense_list: "CHECKING EXPENSES", expense_reports: "CHECKING REPORTS", expense_categories: "CHECKING CATEGORIES", add_expense: "ADDING EXPENSE",
     calendar_events: "CHECKING CALENDAR", calendar_add_event: "ADDING TO CALENDAR", remember_correction: "LEARNING A WORD", web_search: "SEARCHING THE WEB",
   };
@@ -2053,7 +2310,12 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   const ROW_LIMIT = 15; // more than this and the card points to Zoho CRM for the rest
 
   function renderCards(cards) {
-    return cards.map((c) => (c.kind === "mail" ? mailCard(c) : c.kind === "calendar" ? calendarCard(c) : crmCard(c))).join("");
+    return cards.map((c) => (c.kind === "mail" ? mailCard(c) : c.kind === "calendar" ? calendarCard(c) : c.kind === "choice" ? choiceCard(c) : crmCard(c))).join("");
+  }
+  /** Jo isn't sure which one you mean: tap one (or just say it). */
+  function choiceCard(c) {
+    return `<div class="card choice-card"><div class="what">${esc(c.question)}</div><div class="btns">${
+      c.options.map((o) => `<button class="btn" data-ask="${esc(o.say)}">${esc(o.label)}</button>`).join("")}</div></div>`;
   }
   function crmCard(c) {
     const shown = c.rows.slice(0, ROW_LIMIT);
@@ -2375,7 +2637,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     micIdle = setTimeout(() => { micStream?.getTracks().forEach((t) => t.stop()); micStream = null; }, MIC_IDLE_MS);
   }
   async function startRecording() {
-    if (settings.geminiEars === false || !settings.geminiKey || !navigator.mediaDevices?.getUserMedia) return null;
+    // In the Android app the phone's recognizer has the microphone, so it isn't opened twice.
+    if (inApp || settings.geminiEars === false || !settings.geminiKey || !navigator.mediaDevices?.getUserMedia) return null;
     try {
       const stream = await microphone();
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2987,7 +3250,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   // Buttons inside answer cards (Read, Draft reply, Yes, Cancel…) ask just like typing it.
   transcript.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-ask]");
-    if (b) { b.closest(".confirm-card")?.remove(); ask(b.dataset.ask); }
+    if (b) { b.closest(".confirm-card, .choice-card")?.remove(); ask(b.dataset.ask); }
     const act = e.target.closest("button[data-act]");
     if (act && agent?.tools.pending) {
       syncMailCard();
@@ -3071,6 +3334,10 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     ? (settings.tamil ? `வணக்கம்${hello}. நான் தயார்.` : `Good to see you${hello}. All systems ready. What do you need?`)
     : `Welcome${hello}. Open Settings (the gear, top right), add your name and your free Gemini key, then connect Zoho.`);
   renderAgenda();
+  // The Android app asks for this when Jo Office is opened by the assistant gesture or "Talk to Jo".
+  const listenOnRequest = () => { if (!window.JoListenRequested) return; window.JoListenRequested = false; if (!rec) listen(); };
+  addEventListener("jo-listen", listenOnRequest);
+  listenOnRequest();
   setInterval(tickClock, 1000 * 15);
   setInterval(checkBrief, 60000);
   setInterval(() => renderAgenda(true), 10 * 60000);
