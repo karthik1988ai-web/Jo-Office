@@ -247,6 +247,73 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 /* cards shown while Jo is still writing the answer */
 .msg.early { opacity: 0.85; }
 
+/* ---- Settings as a big centred pop-up window ---- */
+.drawer-backdrop { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(3px); }
+.drawer {
+  top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%);
+  width: min(1000px, 94vw); height: min(90vh, 900px);
+  border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  animation: settings-in 0.18s ease-out;
+}
+@keyframes settings-in { from { opacity: 0; transform: translate(-50%, -48%) scale(0.98); } to { opacity: 1; transform: translate(-50%, -50%); } }
+.drawer-head { padding: 18px 24px; }
+.drawer-head h2 { font-size: 20px; }
+.drawer-head .icon-btn { font-size: 18px; width: 40px; height: 40px; }
+.drawer-body {
+  flex: 1; padding: 20px 24px 24px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; align-content: start;
+}
+.drawer section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+.drawer h3 { font-size: 15px; margin-bottom: 12px; }
+.drawer label { font-size: 14px; }
+.drawer .hint { font-size: 13.5px; line-height: 1.55; }
+.drawer input:not([type="checkbox"]), .drawer select, .drawer textarea { padding: 10px 12px; font-size: 15px; background: var(--side); }
+.drawer .test { padding: 8px 14px; font-size: 14px; }
+.drawer-foot { grid-column: 1 / -1; padding: 8px 0 0; }
+.drawer-foot .primary { max-width: 320px; margin-left: auto; display: block; padding: 12px; font-size: 15px; }
+@media (max-width: 700px) {
+  .drawer { width: 100vw; height: 100dvh; border-radius: 0; border: 0; }
+  .drawer-body { grid-template-columns: 1fr; padding: 14px 14px 20px; }
+  .drawer-foot .primary { max-width: none; }
+}
+.drawer-foot { position: sticky; bottom: -24px; margin: 4px -24px -24px; padding: 12px 24px; background: var(--side); border-top: 1px solid var(--line); z-index: 2; }
+@media (max-width: 700px) { .drawer-foot { bottom: -20px; margin: 4px -14px -20px; padding: 12px 14px; } }
+
+/* ---- call logs and meeting reports ---- */
+.rec-panel { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); z-index: 60;
+  background: var(--side); border: 1px solid var(--acc); border-radius: 16px; padding: 14px 16px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5); }
+.rec-head { display: flex; align-items: center; gap: 10px; font-size: 16px; }
+.rec-head b { flex: 1; }
+.rec-time { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600; color: #ff5c5c; }
+.rec-dot { width: 12px; height: 12px; border-radius: 50%; background: #ff3b3b; animation: rec-blink 1s steps(2, start) infinite; }
+.rec-panel[data-stage="setup"] .rec-dot, .rec-panel[data-stage="working"] .rec-dot { animation: none; background: var(--muted); }
+@keyframes rec-blink { to { visibility: hidden; } }
+.rec-panel .hint { margin: 8px 0; font-size: 13.5px; color: var(--sub); line-height: 1.5; }
+.rec-panel label { display: grid; gap: 4px; font-size: 13px; color: var(--sub); }
+.rec-panel select { padding: 8px 10px; font-size: 14px; }
+.rec-panel .consent { font-size: 12.5px; color: #f0b55a; line-height: 1.5; margin: 8px 0; }
+.rec-status { font-size: 12.5px; color: var(--muted); min-height: 16px; margin: 6px 0; }
+.rec-panel .btns { justify-content: flex-end; }
+.rec-panel .btn { padding: 7px 14px; font-size: 13.5px; }
+.report-card label { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; margin: 5px 0; font-size: 12.5px; color: var(--sub); }
+.report-card input, .report-card select, .report-card textarea { width: 100%; min-width: 0; padding: 6px 8px; font-size: 13.5px; }
+.report-card textarea { margin: 8px 0; font-family: inherit; line-height: 1.5; resize: vertical; }
+.report-card .rep-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.report-card .rep-row label { grid-template-columns: auto 1fr; flex: 1; min-width: 160px; }
+.report-card .rep-task { display: grid; grid-template-columns: auto 1fr 140px 140px; gap: 6px; align-items: center; margin: 4px 0; }
+.report-card .rep-task input[type="checkbox"] { width: auto; }
+.report-card .rep-task .quote { grid-column: 2 / -1; color: var(--muted); font-size: 11.5px; font-style: italic; margin-top: -2px; }
+.report-card details { margin: 8px 0; font-size: 12.5px; color: var(--sub); }
+.report-card .rep-transcript { max-height: 220px; overflow: auto; white-space: pre-wrap; margin-top: 6px; line-height: 1.5; }
+.report-card .rep-msg { font-size: 12.5px; color: var(--sub); margin: 6px 0; }
+@media (max-width: 700px) {
+  .report-card label { grid-template-columns: 1fr; }
+  .report-card .rep-task { grid-template-columns: auto 1fr; }
+  .report-card .rep-task select, .report-card .rep-task input[type="date"] { grid-column: 2; }
+  .rec-panel { bottom: 70px; }
+}
+
 </style>
 </head>
 <body>
@@ -325,12 +392,34 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         <button data-ask="What tasks are pending with my team?" title="Team tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm8 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM2 19c0-3 3-5 6-5s6 2 6 5zm12.5 0c0-1.8-.7-3.3-1.9-4.4A7 7 0 0 1 16 14c3 0 6 2 6 5z"/></svg>Team</button>
         <button data-ask="Summarise my open deals and which close this month." title="Deal pipeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V10h3v10zm6 0V4h3v16zm6 0v-7h3v7z"/></svg>Deals</button>
         <button data-ask="What is the status of my expense reports?" title="Expense reports"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2zm3 5v2h6V7zm0 4v2h6v-2z"/></svg>Expenses</button>
+        <button data-report="call" title="Dictate a call log after a phone call"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11 11 0 0 0 3.6.6 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.6 3.6a1 1 0 0 1-.25 1z"/></svg>Log call</button>
+        <button data-report="meeting" title="Dictate meeting minutes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5zm9 1.5V8h3.5zM8 11v2h8v-2zm0 4v2h8v-2z"/></svg>Meeting report</button>
+        <button data-report="record" title="Record a meeting (room microphone or a Meet/Zoom tab)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg>Record meeting</button>
       </div>
       <form class="ask" id="ask-form" autocomplete="off">
         <input id="ask-input" placeholder="Ask Jo Office anything…" aria-label="Ask Jo Office">
         <button type="submit" class="send" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21 23 12 2 3v7l15 2-15 2z"/></svg></button>
       </form>
     </section>
+  </div>
+
+  <div class="rec-panel" id="rec-panel" hidden role="dialog" aria-label="Report recording">
+    <div class="rec-head"><span class="rec-dot"></span><b id="rec-title">Log a call</b><span class="rec-time" id="rec-time"></span></div>
+    <p class="hint" id="rec-hint"></p>
+    <div id="rec-setup" hidden>
+      <label>Record from
+        <select id="rec-source">
+          <option value="mic">This room (microphone)</option>
+          <option value="tab">A Google Meet / Zoom tab in Chrome, plus your microphone</option>
+        </select></label>
+      <p class="consent">⚠ Tell everyone that the meeting is being recorded, and record only with their consent. The audio goes to Google Gemini to be written down. For a tab, choose it in Chrome's window and tick "Share tab audio".</p>
+    </div>
+    <div class="rec-status" id="rec-status"></div>
+    <div class="btns">
+      <button class="btn primary" id="rec-start" hidden>Start recording</button>
+      <button class="btn primary" id="rec-stop" hidden>■ Stop and write the report</button>
+      <button class="btn" id="rec-cancel">Cancel</button>
+    </div>
   </div>
 
   <footer class="wavebar idle" id="wavebar">
@@ -351,7 +440,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   <div class="drawer-body">
     <section>
       <h3>You</h3>
-      <label>Your name<input data-setting="userName" placeholder="e.g. Karthik" autocomplete="name"></label>
+      <label>Your name (signs your emails)<input data-setting="userName" placeholder="e.g. Karthik" autocomplete="name"></label>
+      <label>What Jo calls you<input data-setting="callMe" placeholder="KK"></label>
       <label>Theme
         <select data-setting="theme" id="theme-select">
           <option value="navy">Midnight navy</option>
@@ -895,6 +985,36 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     }
 
     /**
+     * Writes down a long dictation or a meeting recording (one part of up to about 5 minutes).
+     * [before] is the end of the previous part, so words cut at the join aren't written twice.
+     */
+    async transcribeLong(audioBase64, mimeType, { hints = [], tamil = false, kind = "call", before = "" } = {}) {
+      const prompt = [
+        kind === "record"
+          ? "This is part of a recorded business meeting in Tamil Nadu, India. Write down everything that is said, in English (Tamil speech translated into plain English; names and numbers exactly). Start a new line when the speaker changes; you may write a speaker's name before their words if it is clear (\"Suresh: …\")."
+          : `This is someone dictating a ${kind === "meeting" ? "meeting report" : "note about a phone call"} in Tamil Nadu, India. Write down exactly what they say${tamil ? " (Tamil speech in plain English; names and numbers exactly)" : ", in English"}.`,
+        hints.length ? `Names and words they often use; when a word sounds like one of these, use this spelling: ${hints.join(", ")}.` : "",
+        before ? `The previous part ended with: "${before}". Don't repeat those words; continue from there.` : "",
+        "Reply with only the words spoken: no headings, quotes or notes. If nothing is said, reply with nothing.",
+      ].filter(Boolean).join("\n");
+      const json = await this.request(
+        { contents: [{ role: "user", parts: [{ inlineData: { mimeType, data: audioBase64 } }, { text: prompt }] }] },
+        { models: [DEFAULT_MODEL, FALLBACK_MODEL] },
+      );
+      return Gemini.text(Gemini.parse(json)).trim();
+    }
+
+    /** One answer as JSON (for structured extraction). Returns the parsed object, or throws. */
+    async json(system, prompt) {
+      const res = await this.request({
+        systemInstruction: { parts: [{ text: system }] }, contents: [Gemini.userText(prompt)],
+        generationConfig: { responseMimeType: "application/json" },
+      }, { models: [DEFAULT_MODEL, FALLBACK_MODEL] });
+      const text = Gemini.text(Gemini.parse(res)).replace(/^```(?:json)?\s*|\s*```$/g, "");
+      try { return JSON.parse(text); } catch { throw new Error("Gemini's report wasn't readable. Please try again."); }
+    }
+
+    /**
      * Posts [body] to generateContent and returns the raw JSON. Busy errors are retried, then the
      * next model is tried. Replies are faster with little "thinking", so that is asked for; models
      * that don't support it are remembered and asked without. nextOnReject: any refusal from a
@@ -1075,7 +1195,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   // Zoho answers take 1.5 to 6 seconds, so read results are kept for a short while: the panels,
   // the brief and your questions share them, and two identical requests at once make one call.
   // Any change (a mail sent, a record updated) clears everything, so nothing stale is shown.
-  const CHANGE_ACTIONS = /^(mail_send|crm_create|crm_update|crm_add_note|expense_create|calendar_add|zoho_connect)$/;
+  const CHANGE_ACTIONS = /^(mail_send|crm_create|crm_update|crm_add_note|crm_log_activity|expense_create|calendar_add|zoho_connect)$/;
   class Bridge {
     constructor(url, key, http = defaultHttp) { Object.assign(this, { url: url.trim(), key: key.trim(), http, cache: new Map() }); }
 
@@ -1213,7 +1333,10 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       { query: ["string", "One COQL select statement"] }, ["query"]),
     fn("crm_my_tasks", "The user's open Zoho CRM tasks with due dates."),
     fn("crm_meetings", "Meetings logged in Zoho CRM (Events, linked to customers) from today for the given days. For the user's own schedule use calendar_events.", { days: ["integer", "1 = today, 7 = this week. Default 1"] }),
-    fn("crm_pipeline", "The user's open Zoho CRM deals with stage, amount and closing date."),
+    fn("crm_pipeline", "The user's open Zoho CRM deals (stage, amount, closing date) with a summary the app counts: how many close this month, how many are overdue. Use period for a closing-date window (\"which deals close this month\" = this_month).", {
+      period: ["string", "this_month, next_month, overdue (closing date passed but still open), range (with from and to) or all. Default all"],
+      from: ["string", "For range: first closing date, YYYY-MM-DD"], to: ["string", "For range: last closing date, YYYY-MM-DD"],
+    }),
     fn("crm_create_lead", "Create a lead in Zoho CRM. Needs the user's confirmation.", {
       last_name: ["string", "Last name (required by Zoho)"], first_name: ["string", "First name"], company: ["string", "Company"],
       email: ["string", "Email"], phone: ["string", "Phone"], description: ["string", "Notes about the lead"],
@@ -1492,8 +1615,10 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
           case "calendar_events": return await this.listCalendar(Math.min(Math.max(Number(args.days) || 1, 1), 31), args.from);
           case "crm_pipeline": {
             const { deals, crmUrl } = await this.read("crm_pipeline");
-            const card = this.crmCard("Deals", deals, crmUrl, ["Deals owned by you", "Not closed won or lost"], 50, "Your open deals");
-            return deals.length ? json(deals, 8000) + this.computed(card) : "No open deals.";
+            if (!deals.length) return "No open deals.";
+            const pick = dealPeriod(deals, args.period, args.from, args.to);
+            const card = this.crmCard("Deals", pick.list, crmUrl, ["Deals owned by you", "Open (closed stages left out)", ...(pick.range ? [pick.range] : [])], 500, pick.title);
+            return `${dealSummary(deals)}\n\n${pick.title} (${pick.list.length}):\n${pick.list.length ? json(pick.list, 8000) : "(none)"}` + this.computed(card);
           }
           case "expense_list": return json((await this.read("expense_list", { limit: args.limit || 20 })).expenses);
           case "expense_reports": return json((await this.read("expense_reports")).reports);
@@ -1733,7 +1858,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         safe(() => this.listCalendar(1)),
         safe(() => this.listTasks()),
         safe(() => this.listTeamTasks()),
-        safe(async () => { const { deals } = await this.read("crm_pipeline"); return json(deals, 4000) + this.computed(this.crmCard("Deals", deals, "", [], 50, "", false)); }),
+        safe(async () => { const { deals } = await this.read("crm_pipeline"); return `${dealSummary(deals)}\nClosing this month: ${json(dealPeriod(deals, "this_month").list, 3000)}`; }),
         safe(() => this.unreadMail(12)),
         safe(async () => json((await this.read("expense_reports")).reports, 2500)),
       ]);
@@ -1767,6 +1892,32 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 
     /** Everyone in the company's Zoho CRM, as { id, name, email, role }. */
     async team() { return (await this.read("crm_users", {}, 600000)).users || []; }
+
+    /**
+     * The CRM records a report could belong to: the customer person (Contacts, then Leads) and the
+     * company's open deals and account. Returns { contacts: [...], related: [...] }, best first.
+     */
+    async reportLinks(r) {
+      const search = async (module, word) => {
+        if (!word || word.length < 2) return [];
+        try { return (await this.read("crm_search", { module, word: word.slice(0, 60), limit: 5 })).records || []; } catch { return []; }
+      };
+      const label = (module, x) => `${recordName(x) || "(no name)"}${x.Account_Name?.name && module !== "Accounts" ? ` · ${x.Account_Name.name}` : ""}${x.Stage ? ` · ${x.Stage}` : ""}`;
+      const asOption = (module) => (x) => ({ module, id: String(x.id), label: `${{ Contacts: "Contact", Leads: "Lead", Deals: "Deal", Accounts: "Account" }[module]}: ${label(module, x)}` });
+      const [people, leads, deals, accounts] = await Promise.all([
+        search("Contacts", r.person), search("Leads", r.person || r.company), search("Deals", r.company || r.person), search("Accounts", r.company),
+      ]);
+      const open = deals.filter((d) => !/^closed|\bwon\b|\blost\b/i.test(String(d.Stage || "")));
+      return {
+        contacts: [...people.map(asOption("Contacts")), ...leads.map(asOption("Leads"))].slice(0, 8),
+        related: [...open.map(asOption("Deals")), ...accounts.map(asOption("Accounts"))].slice(0, 8),
+      };
+    }
+
+    /** Saves a checked report to Zoho CRM (the bridge's crm_log_activity). */
+    async saveReport(payload) {
+      return await this.zoho().call("crm_log_activity", payload); // a change: the bridge forgets its copies
+    }
 
     /** The team member a spoken name means. Unclear or unknown names come back as a question. */
     async teamMember(name) {
@@ -2054,6 +2205,155 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
 
   // ...but "search my mail for …" or "look up a lead" is the user's own data, not the web.
   const OWN_DATA_WORDS = /\b(mails?|e-?mails?|inbox|zoho|crm|leads?|deals?|contacts?|accounts?|tasks?|meetings?|calendar|schedule|free|expenses?|reports?|customers?|clients?)\b|மெயில்/i;
+  // ---------- call logs and meeting reports ----------
+  // You dictate after a call or meeting (or record the meeting); Gemini writes it down and pulls out
+  // the report; the app then checks it: an action item is kept only if its quote was really said,
+  // only team members get tasks, and dates must be real dates. Nothing reaches Zoho before Save.
+  const words = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean);
+
+  /** Joins transcribed parts, dropping words repeated where two parts overlap. */
+  function joinChunks(texts) {
+    let out = [];
+    for (const t of texts.map((x) => String(x || "").trim()).filter(Boolean)) {
+      const next = t.split(/\s+/);
+      const a = out.slice(-15).map((w) => words(w).join(" ")), b = next.slice(0, 15).map((w) => words(w).join(" "));
+      let cut = 0;
+      for (let n = Math.min(a.length, b.length); n >= 2; n--) {
+        if (a.slice(-n).join(" ") === b.slice(0, n).join(" ")) { cut = n; break; }
+      }
+      out = out.concat(next.slice(cut));
+    }
+    return out.join(" ");
+  }
+
+  /** True when [quote] was said in [transcript]: word for word, or (allowing for small slips) 85% of its words in order. */
+  function quoteSaid(quote, transcript) {
+    const q = words(quote), t = words(transcript);
+    if (q.length < 2) return false;
+    if (` ${t.join(" ")} `.includes(` ${q.join(" ")} `)) return true;
+    let i = 0, hit = 0;
+    for (const w of q) { const at = t.indexOf(w, i); if (at >= 0 && at - i < 12) { hit++; i = at + 1; } }
+    return hit / q.length >= 0.85;
+  }
+
+  /** The team member [name] means: "me"/"I"/the user's own name → the user; null when it's nobody in the team. */
+  function teamMember(name, team = [], me = "") {
+    const n = words(name).join(" ");
+    if (!n) return null;
+    if (/^(i|me|myself|we|us)$/.test(n) || (me && words(me).join(" ") === n)) return { id: "", name: me || "You", self: true };
+    const full = team.find((u) => words(u.name).join(" ") === n);
+    if (full) return full;
+    const first = team.filter((u) => words(u.name)[0] === words(name)[0] || words(u.name).includes(n));
+    return first.length ? first[0] : null;
+  }
+
+  const REPORT_SYSTEM = [
+    "You turn a dictated call note, meeting minutes or a meeting transcript into a structured business report, as JSON.",
+    "Use only what is in the transcript. Never invent attendees, decisions, amounts or tasks. Unknown means an empty string or empty list.",
+    "Every action item needs \"quote\": the exact words from the transcript it comes from, copied word for word. No quote, no action item.",
+    "Dates: work them out from today's date given below and write them as YYYY-MM-DD; if no date was said, leave due empty.",
+    "Write the summary and points in clear, short business English.",
+  ].join("\n");
+
+  function reportPrompt(kind, transcript, { now = new Date(), team = [], me = "", products = [] } = {}) {
+    return [
+      `Today is ${now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} (${isoDate(now)}), now ${now.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}.`,
+      `This is a ${kind === "call" ? "note dictated after a phone call" : kind === "record" ? "transcript of a recorded meeting" : "dictated meeting report"}. The user is ${me || "the speaker"}.`,
+      team.length ? `The user's team (colleagues who can be given tasks): ${team.map((u) => u.name).join(", ")}.` : "",
+      products.length ? `Products the company sells: ${products.join(", ")}.` : "",
+      "",
+      "Reply with JSON in exactly this shape:",
+      `{"subject": "short title, e.g. Uflex – film rate review", "customer_company": "", "customer_person": "the main customer contact named",`,
+      ` "call_type": "Outbound or Inbound (calls only)", "result": "Interested, Not interested, Requested more info, Requested call back or empty",`,
+      ` "product": "", "date": "YYYY-MM-DD or empty", "time": "HH:MM 24-hour or empty", "duration_minutes": 0, "venue": "",`,
+      ` "attendees_us": [], "attendees_them": [], "summary": "2 to 4 sentences", "discussed": [], "decisions": [],`,
+      ` "actions": [{"owner": "who will do it, as said", "task": "what, starting with a verb", "due": "YYYY-MM-DD or empty", "quote": "exact words"}],`,
+      ` "customer_actions": ["things the customer side will do"]}`,
+      "",
+      "Transcript:", transcript,
+    ].filter((l) => l !== "").join("\n");
+  }
+
+  /** The report Gemini gave, checked and tidied by the app. */
+  function checkReport(raw, transcript, { kind = "call", now = new Date(), team = [], me = "" } = {}) {
+    const list = (v) => (Array.isArray(v) ? v.map((x) => String(x ?? "").trim()).filter(Boolean) : []);
+    const str = (v) => String(v ?? "").trim();
+    const day = (v) => (ISO_DAY.test(str(v)) && !Number.isNaN(Date.parse(str(v))) ? str(v) : "");
+    const r = {
+      kind, subject: str(raw.subject).slice(0, 200), company: str(raw.customer_company), person: str(raw.customer_person),
+      callType: /^in/i.test(str(raw.call_type)) ? "Inbound" : "Outbound", result: str(raw.result), product: str(raw.product), venue: str(raw.venue),
+      attendeesUs: list(raw.attendees_us), attendeesThem: list(raw.attendees_them), summary: str(raw.summary),
+      discussed: list(raw.discussed), decisions: list(raw.decisions), customerActions: list(raw.customer_actions),
+      actions: [], dropped: [],
+    };
+    const dur = Math.round(Number(raw.duration_minutes));
+    r.durationMin = dur > 0 && dur <= 600 ? dur : kind === "call" ? 5 : 60;
+    const date = day(raw.date) || isoDate(now);
+    const time = /^\d{1,2}:\d{2}$/.test(str(raw.time)) ? str(raw.time).padStart(5, "0") : "";
+    r.start = time ? parseLocal(`${date}T${time}`) : (date === isoDate(now) ? now.getTime() - r.durationMin * 60000 : parseLocal(`${date}T10:00`));
+    if (!r.subject) r.subject = `${kind === "call" ? "Call" : "Meeting"}${r.company || r.person ? ` with ${r.company || r.person}` : ""}`;
+    for (const a of Array.isArray(raw.actions) ? raw.actions : []) {
+      const task = str(a?.task), quote = str(a?.quote), owner = str(a?.owner);
+      if (!task) continue;
+      if (!quoteSaid(quote, transcript)) { r.dropped.push(task); continue; } // not really said: never becomes a task
+      const who = owner ? teamMember(owner, team, me) : { id: "", name: me || "You", self: true };
+      if (!who) { r.customerActions.push(`${owner}: ${task}`); continue; } // the customer's side, not a task for the team
+      r.actions.push({ task, quote, due: day(a?.due), owner: who.name, ownerId: who.id || "", self: !!who.self });
+    }
+    return r;
+  }
+
+  /** The report as text, always in the same layout (saved as the CRM description and note). */
+  function reportText(r) {
+    const when = new Date(r.start), end = new Date(r.start + r.durationMin * 60000);
+    const t = (d) => d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+    const dateLine = `${when.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}, ${t(when)}–${t(end)}${r.venue ? `, ${r.venue}` : ""}`;
+    const bullets = (title, xs) => (xs.length ? [`${title}:`, ...xs.map((x) => `  • ${x}`)] : []);
+    const people = [r.attendeesUs.length ? `${r.attendeesUs.join(", ")} (us)` : "", r.attendeesThem.length ? `${r.attendeesThem.join(", ")} (${r.company || "customer"})` : ""].filter(Boolean).join(" · ");
+    return [
+      `${r.kind === "call" ? `Call (${r.callType.toLowerCase()})` : "Meeting"}: ${r.subject}`, dateLine,
+      people ? `Attendees: ${people}` : "", r.result ? `Result: ${r.result}` : "",
+      r.summary ? `Summary: ${r.summary}` : "",
+      ...bullets("Discussed", r.discussed), ...bullets("Decisions", r.decisions),
+      ...(r.actions.length ? ["Action items:", ...r.actions.map((a) => `  ☐ ${a.owner} – ${a.task}${a.due ? ` – ${a.due}` : ""}   ("${a.quote}")`)] : []),
+      ...bullets("Waiting on customer", r.customerActions),
+      r.kind === "record" ? "Recorded with the consent of those present." : "",
+    ].filter(Boolean).join("\n");
+  }
+
+  // ---------- deals by closing date ----------
+  const monthRange = (offset = 0, now = new Date()) =>
+    [isoDate(new Date(now.getFullYear(), now.getMonth() + offset, 1)), isoDate(new Date(now.getFullYear(), now.getMonth() + offset + 1, 0))];
+  const shortDate = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+  /** The deals in one closing-date window, with a card title. Deals without a closing date only appear in "all". */
+  function dealPeriod(deals, period = "all", from = "", to = "", now = new Date()) {
+    const today = isoDate(now);
+    const within = (a, b) => deals.filter((d) => d.Closing_Date && d.Closing_Date >= a && d.Closing_Date <= b);
+    const p = String(period || "all").toLowerCase().replace(/\s+/g, "_");
+    if (p === "this_month" || p === "next_month") {
+      const [a, b] = monthRange(p === "this_month" ? 0 : 1, now);
+      return { list: within(a, b), title: `Deals closing ${p === "this_month" ? "this month" : "next month"}`, range: `Closing ${shortDate(a)} – ${shortDate(b)}` };
+    }
+    if (p === "overdue") return { list: deals.filter((d) => d.Closing_Date && d.Closing_Date < today), title: "Overdue deals (closing date passed, still open)", range: `Closing before ${shortDate(today)}` };
+    if (ISO_DAY.test(from || "") || ISO_DAY.test(to || "")) {
+      const a = ISO_DAY.test(from || "") ? from : "0000-01-01", b = ISO_DAY.test(to || "") ? to : "9999-12-31";
+      return { list: within(a, b), title: "Deals in that closing range", range: `Closing ${a > "0000" ? shortDate(a) : "…"} – ${b < "9999" ? shortDate(b) : "…"}` };
+    }
+    return { list: deals, title: "Your open deals", range: "" };
+  }
+  /** One line the app counts itself: open, this month, overdue, later, no date. */
+  function dealSummary(deals, now = new Date()) {
+    const today = isoDate(now), [a, b] = monthRange(0, now);
+    const part = (label, list) => `${label}: ${list.length} (${rupees(list.reduce((t, d) => t + (Number(d.Amount) || 0), 0))})`;
+    const month = deals.filter((d) => d.Closing_Date && d.Closing_Date >= a && d.Closing_Date <= b);
+    const overdue = deals.filter((d) => d.Closing_Date && d.Closing_Date < today);
+    const later = deals.filter((d) => d.Closing_Date && d.Closing_Date > b), none = deals.filter((d) => !d.Closing_Date);
+    return `Summary counted by the app (use exactly these figures): ${[part("Open deals", deals), part("Closing this month", month),
+      part("Overdue (closing date passed, not closed yet; may overlap this month)", overdue), part("Closing later", later),
+      ...(none.length ? [part("No closing date", none)] : [])].join("; ")}.`;
+  }
+
   const WEB_WORDS = /\b(search|google|look\s*up|web|internet|online)\b|தேடு|கூகுள்|இணையத்தில்/i;
 
   /**
@@ -2065,9 +2365,22 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       { name: "get_unread_mail", args: { limit: 10 } }],
     [/^(?:(?:what are|show|list|check|read)\s+(?:me\s+)?)?(?:my\s+)?(?:crm\s+|open\s+|pending\s+)*tasks(?:\s+(?:today|due today|for today|please))?$|^which of my crm tasks are due today or overdue$/,
       { name: "crm_my_tasks", args: {} }],
+    [/^(?:(?:summari[sz]e|show|list|check)\s+(?:me\s+)?)?(?:my\s+)?(?:open\s+)?(?:deals|pipeline)\s+and\s+which\s+(?:ones?\s+)?close\s+this\s+month$|^(?:which|what)\s+(?:of\s+my\s+)?(?:open\s+)?deals\s+(?:close|are\s+closing|closing)\s+this\s+month$|^(?:my\s+)?(?:open\s+)?deals\s+closing\s+this\s+month$/,
+      { name: "crm_pipeline", args: { period: "this_month" } }],
+    [/^(?:(?:summari[sz]e|show|list|check)\s+(?:me\s+)?)?(?:my\s+)?(?:open\s+)?(?:deals|pipeline|deal\s+pipeline)$/,
+      { name: "crm_pipeline", args: { period: "all" } }],
     [/^(?:what'?s\s+on\s+|show\s+|check\s+)?(?:my\s+)?(?:calendar|meetings|schedule|agenda)(?:\s+(?:today|for today))?$|^(?:what are\s+)?(?:my\s+)?meetings today$/,
       { name: "calendar_events", args: { days: 1 } }],
   ];
+  /** "log a call" → call, "meeting report" → meeting, "record the meeting" → record; anything longer goes to Jo as usual. */
+  function reportKind(text) {
+    const t = String(text || "").toLowerCase().replace(/^(?:hey |ok |okay )?(?:jo|joe)[,\s]+/, "").replace(/[?.!,]+/g, " ").replace(/\s+/g, " ").trim();
+    if (/^(?:start\s+)?record(?:ing)?\s+(?:the\s+|this\s+|a\s+|my\s+|our\s+)?meeting(?:\s+now)?$/.test(t)) return "record";
+    if (/^(?:log|record|note|add|save)\s+(?:a\s+|the\s+|my\s+)?(?:phone\s+)?call(?:\s+(?:log|report|note))?$|^(?:a\s+)?call\s+(?:log|report)$/.test(t)) return "call";
+    if (/^(?:(?:write|make|dictate|start|add|create|take)\s+(?:a\s+|the\s+)?)?meeting\s+(?:report|minutes|notes)$|^(?:dictate|write|take)\s+(?:the\s+)?minutes$/.test(t)) return "meeting";
+    return null;
+  }
+
   function shortcutFor(text) {
     const t = String(text || "").toLowerCase().replace(/^(?:hey |ok |okay )?(?:jo|joe)[,\s]+/, "").replace(/[?.!,]+/g, " ").replace(/\s+/g, " ").trim();
     const hit = SHORTCUTS.find(([re]) => re.test(t));
@@ -2075,14 +2388,29 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   }
 
   class Agent {
-    constructor(gemini, tools, tamil = false, userName = "", history = []) {
-      Object.assign(this, { gemini, tools, tamil, userName: userName || "the user", contents: Array.isArray(history) ? history : [] });
+    constructor(gemini, tools, tamil = false, userName = "", history = [], callName = "") {
+      Object.assign(this, { gemini, tools, tamil, userName: userName || "the user", callName: String(callName || "").trim(), contents: Array.isArray(history) ? history : [] });
+    }
+
+    /** The first answer of a new conversation opens with "Hi KK" (the name the user likes). */
+    greet(reply) {
+      const n = this.callName;
+      if (!n || /^\s*(hi|hello|hey|good (morning|afternoon|evening)|வணக்கம்)\b/i.test(reply)) return reply;
+      const rest = /^[A-Z][a-z]/.test(reply) && !/^I\b/.test(reply) ? reply[0].toLowerCase() + reply.slice(1) : reply;
+      return this.tamil ? `வணக்கம் ${n}, ${reply}` : `Hi ${n}, ${rest}`;
+    }
+
+    async ask(text, onTool = () => {}, onCards = () => {}) {
+      const fresh = !this.contents.length;
+      const reply = await this.answer(text, onTool, onCards);
+      return fresh ? this.greet(reply) : reply;
     }
     reset() { this.contents = []; this.tools.cancel(); }
 
     systemPrompt() {
       return [
         `You are Jo Office, ${this.userName}'s work assistant, in the style of a calm, capable AI butler.`,
+        ...(this.callName ? [`Always call the user "${this.callName}" (that is what they like to be called), never by another name or "sir".`] : []),
         "You work with the company's Zoho apps: Zoho Mail, Zoho CRM (leads, contacts, accounts, deals, tasks), Zoho Expense and Zoho Calendar (the user's schedule).",
         this.tamil ? "Always reply in Tamil (தமிழ்), using simple spoken Tamil." : "Reply in clear Indian English.",
         "",
@@ -2182,7 +2510,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
      * One request; [onTool] is told which tool is running (for the HUD), [onCards] gets the cards as
      * soon as the data is in, before the answer is written.
      */
-    async ask(text, onTool = () => {}, onCards = () => {}) {
+    async answer(text, onTool = () => {}, onCards = () => {}) {
       this.trimHistory();
       this.tools.sources = [];
       this.tools.listed = [];
@@ -2259,7 +2587,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       const data = await this.tools.briefData();
       const prompt = [
         `[Now: ${this.now()}]`,
-        `Write ${this.userName}'s spoken morning work brief from the data below. Order: a one-line greeting, today's meetings,`,
+        `Write ${this.userName}'s spoken morning work brief from the data below. Order: a one-line greeting${this.callName ? ` (starting "${this.tamil ? "வணக்கம்" : "Good morning"} ${this.callName}")` : ""}, today's meetings,`,
         "tasks due today or overdue, team members' overdue tasks (by name), deals closing soon, only the emails that look important (skip newsletters and promotions),",
         "and expense reports waiting for approval. Keep numbers exact and in digits (amounts as ₹1,20,000, never in words), about 120 to 180 words.",
         "If a source is not connected or unavailable, mention it in a few words. Plain sentences for text-to-speech: no lists, symbols or markdown.",
@@ -2326,7 +2654,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       .replace(/\b(\d{1,3}(?:,\d{2})*,\d{3})\b/g, (n) => amount(n)); // other grouped numbers: 1,20,000 → 120000
   }
 
-  const api = { shortcutFor, REPLY_WORDS, forSpeech, Writer, WRITER_ENGINES, CLAUDE_MODEL, MAIL_TOOLS, SpeechMemory, wordFixes, encodeWav, isYes, isNo, extractFigures, matchWake, DEFAULT_TTS_MODEL, GEMINI_VOICES, describeMail, DEFAULT_MODEL, FALLBACK_MODEL, Gemini, Bridge, Tools, Agent, WRITE_TOOLS, parseLocal, formatTime, formatClock, isoDate, isoLocal, calTime, startOfToday, stripHtml };
+  const api = { reportKind, joinChunks, quoteSaid, teamMember, REPORT_SYSTEM, reportPrompt, checkReport, reportText, dealPeriod, dealSummary, shortcutFor, REPLY_WORDS, forSpeech, Writer, WRITER_ENGINES, CLAUDE_MODEL, MAIL_TOOLS, SpeechMemory, wordFixes, encodeWav, isYes, isNo, extractFigures, matchWake, DEFAULT_TTS_MODEL, GEMINI_VOICES, describeMail, DEFAULT_MODEL, FALLBACK_MODEL, Gemini, Bridge, Tools, Agent, WRITE_TOOLS, parseLocal, formatTime, formatClock, isoDate, isoLocal, calTime, startOfToday, stripHtml };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.JoCore = api;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -2352,11 +2680,12 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   const storage = {
     getItem(k) { try { return localStorage.getItem(k); } catch { return memory.get(k) ?? null; } },
     setItem(k, v) { try { localStorage.setItem(k, v); } catch { memory.set(k, String(v)); } },
+    removeItem(k) { memory.delete(k); try { localStorage.removeItem(k); } catch { /* blocked: memory only */ } },
   };
   const readJson = (k, fallback) => { try { return JSON.parse(storage.getItem(k)) ?? fallback; } catch { return fallback; } };
 
   const DEFAULTS = {
-    userName: "", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
+    userName: "", callMe: "KK", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
     tamil: false, speak: true,
     voiceEngine: "gemini", fastVoice: true, geminiVoiceEn: "Charon", geminiVoiceTa: "Kore", pcVoiceEn: "", pcVoiceTa: "", ttsModel: "",
     theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, voiceReview: true, writerEngine: "gemini", openaiKey: "", openaiModel: "", claudeKey: "", geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
@@ -2364,6 +2693,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
   const userName = () => settings.userName || "there";
+  /** What Jo calls the user ("KK"); the full name is still used to sign emails. */
+  const callMe = () => String(settings.callMe ?? "").trim() || settings.userName || "";
   const learned = new SpeechMemory(storage); // words you corrected once, understood right from then on
 
   const health = readJson("office.health", {}); // last test result per system: "ok" | "err"
@@ -2399,7 +2730,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       const tools = buildTools();
       tools.search = gemini; // web search uses the same Gemini key
       tools.writer = makeWriter(gemini);
-      agent = new Agent(gemini, tools, settings.tamil, settings.userName, savedHistory().contents);
+      agent = new Agent(gemini, tools, settings.tamil, settings.userName, savedHistory().contents, callMe());
     }
     return agent;
   }
@@ -2487,7 +2818,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   const ROW_LIMIT = 15; // more than this and the card points to Zoho CRM for the rest
 
   function renderCards(cards) {
-    return cards.map((c) => (c.kind === "mail" ? mailCard(c) : c.kind === "calendar" ? calendarCard(c) : c.kind === "choice" ? choiceCard(c) : crmCard(c))).join("");
+    return cards.map((c) => (c.kind === "mail" ? mailCard(c) : c.kind === "calendar" ? calendarCard(c) : c.kind === "choice" ? choiceCard(c) : c.kind === "report" ? reportCard(c) : crmCard(c))).join("");
   }
   /** Jo isn't sure which one you mean: tap one (or just say it). */
   function choiceCard(c) {
@@ -3047,6 +3378,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     text = text.trim();
     followUpPending = false;
     if (!text || busy) return;
+    const reportMode = JoCore.reportKind(text); // "log a call", "meeting report", "record the meeting"
+    if (reportMode) { addMsg("me", text, { voice }); beginReport(reportMode); return; }
     syncMailCard();
     addMsg("me", text, { voice });
     const a = getAgent();
@@ -3085,6 +3418,304 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       addMsg("jo", e.message, { error: true });
       setState("error", "ERROR · SEE MESSAGE"); setTimeout(() => setState("idle"), 3000);
     } finally { busy = false; }
+  }
+
+  // ---------- call logs and meeting reports ----------
+  // Report mode records until you tap Stop (pauses never end it). Long recordings are cut into
+  // 5-minute parts with a 2-second overlap, written down while the meeting goes on; the parts
+  // written so far are kept in this browser, so a reload or a dropped network loses nothing.
+  const CHUNK_MS = 5 * 60000, OVERLAP_S = 2, REC_KEY = "office.recording";
+  const REPORT_NAMES = { call: "Call log", meeting: "Meeting report", record: "Recorded meeting" };
+  const REPORT_HINTS = {
+    call: "Speak freely: who you spoke to, what was discussed, the result and the next step. Pauses are fine. Tap Stop when you're done.",
+    meeting: "Say who attended, what was discussed, what was decided, and who will do what by when. Pauses are fine. Tap Stop when you're done.",
+    record: "Keep this page open and the screen on. Jo writes the meeting down every 5 minutes while it runs.",
+  };
+  let recording = null; // the recording in progress
+  const reports = new Map(); // report id → the checked report its card shows
+  const two = (n) => String(n).padStart(2, "0");
+  const clock = (ms) => { const s = Math.floor(ms / 1000); return s >= 3600 ? `${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`; };
+
+  function showRecPanel(kind, stage) {
+    $("rec-panel").hidden = false;
+    $("rec-panel").dataset.kind = kind;
+    $("rec-panel").dataset.stage = stage; // setup | live | working
+    $("rec-title").textContent = REPORT_NAMES[kind];
+    $("rec-hint").textContent = stage === "setup" ? "" : REPORT_HINTS[kind];
+    $("rec-setup").hidden = stage !== "setup";
+    $("rec-start").hidden = stage !== "setup";
+    $("rec-stop").hidden = stage !== "live";
+    $("rec-cancel").hidden = stage === "working";
+    if (stage === "setup") { $("rec-time").textContent = ""; $("rec-status").textContent = ""; }
+  }
+  const hideRecPanel = () => { $("rec-panel").hidden = true; };
+  function recStatus() {
+    const r = recording; if (!r) return;
+    $("rec-time").textContent = clock(Date.now() - r.started);
+    const done = r.parts.filter((p) => p !== null).length;
+    $("rec-status").textContent = r.kind === "record" ? `${done} of ${r.parts.length} parts written down${r.failed.size ? ` · ${r.failed.size} to retry` : ""}` : "";
+  }
+  const saveRecording = () => {
+    if (!recording) return;
+    try { storage.setItem(REC_KEY, JSON.stringify({ kind: recording.kind, started: recording.started, parts: recording.parts.map((p) => p ?? "") })); } catch { /* full: the parts are still in memory */ }
+  };
+
+  /** Starts report mode; a recorded meeting first asks where the sound comes from (with the consent note). */
+  function beginReport(kind) {
+    if (recording || busy) return;
+    if (!settings.geminiKey) { addMsg("jo", "Please add your Gemini API key in Settings first.", { error: true }); openSettings(); return; }
+    stopSpeaking();
+    if (kind === "record") showRecPanel(kind, "setup");
+    else startRecordingReport(kind, "mic");
+  }
+
+  async function startRecordingReport(kind, source) {
+    let streams = [];
+    try {
+      streams.push(await microphone());
+      if (source === "tab") {
+        if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("This browser can't record another tab. Use the room microphone instead.");
+        const shared = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, selfBrowserSurface: "exclude", systemAudio: "include" });
+        if (!shared.getAudioTracks().length) {
+          shared.getTracks().forEach((t) => t.stop());
+          throw new Error('No sound came from that tab. Choose the Meet or Zoom tab and tick "Share tab audio".');
+        }
+        streams.push(shared);
+      }
+    } catch (e) {
+      hideRecPanel();
+      addMsg("jo", e.name === "NotAllowedError" ? "Recording was not allowed (microphone or tab sharing was refused)." : e.message, { error: true });
+      return;
+    }
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    // The microphone and the meeting tab are mixed into one recording (your voice and theirs).
+    const inputs = streams.map((s) => { const src = ctx.createMediaStreamSource(new MediaStream(s.getAudioTracks())); src.connect(node); return src; });
+    node.connect(ctx.destination);
+    const r = recording = {
+      kind, source, started: Date.now(), cutAt: Date.now(), rate: ctx.sampleRate, pieces: [], parts: [], jobs: [], failed: new Map(),
+      ctx, node, inputs, shared: streams[1] || null, wake: null, timer: null,
+    };
+    node.onaudioprocess = (e) => {
+      if (recording !== r) return;
+      r.pieces.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      if (Date.now() - r.cutAt >= CHUNK_MS) cutPart(r);
+    };
+    r.shared?.getAudioTracks()[0]?.addEventListener("ended", () => { if (recording === r) toast("The meeting tab stopped sharing. Jo keeps recording the microphone; tap Stop when the meeting ends."); });
+    try { r.wake = await navigator.wakeLock?.request("screen"); } catch { /* not supported: the timer still shows */ }
+    r.timer = setInterval(recStatus, 1000);
+    showRecPanel(kind, "live");
+    setState("listening", kind === "record" ? "● RECORDING THE MEETING" : "● RECORDING · TAP STOP WHEN DONE");
+    recStatus();
+    saveRecording();
+  }
+
+  /** Cuts off the audio so far as one part (keeping 2 seconds for the next) and writes it down in the background. */
+  function cutPart(r, last = false) {
+    const pieces = r.pieces;
+    const keep = [];
+    for (let i = pieces.length - 1, n = 0; i >= 0 && n < r.rate * OVERLAP_S; i--) { keep.unshift(pieces[i]); n += pieces[i].length; }
+    r.pieces = last ? [] : keep;
+    r.cutAt = Date.now();
+    const wav = JoCore.encodeWav(pieces, r.rate);
+    const index = r.parts.length;
+    r.parts.push(wav ? null : "");
+    if (wav) r.jobs.push(writePart(r, index, wav));
+    recStatus();
+  }
+  async function writePart(r, index, wav) {
+    try {
+      const before = index > 0 && r.parts[index - 1] ? r.parts[index - 1].split(/\s+/).slice(-12).join(" ") : "";
+      r.parts[index] = await new Gemini(settings.geminiKey, settings.geminiModel)
+        .transcribeLong(wav, "audio/wav", { hints: speechHints(), tamil: settings.tamil, kind: r.kind, before });
+      r.failed.delete(index);
+    } catch {
+      r.failed.set(index, wav); // tried again when the recording stops
+    }
+    if (recording === r) { saveRecording(); recStatus(); }
+  }
+
+  function closeRecording(r) {
+    clearInterval(r.timer);
+    r.node.onaudioprocess = null;
+    try { r.inputs.forEach((i) => i.disconnect()); r.node.disconnect(); } catch { /* already */ }
+    r.ctx.close().catch(() => {});
+    r.shared?.getTracks().forEach((t) => t.stop());
+    r.wake?.release?.().catch?.(() => {});
+    releaseMicLater();
+  }
+
+  async function stopReport() {
+    const r = recording; if (!r) return;
+    cutPart(r, true);
+    closeRecording(r);
+    showRecPanel(r.kind, "working");
+    $("rec-status").textContent = "Writing it down…";
+    setState("thinking", "WRITING IT DOWN…");
+    await Promise.all(r.jobs);
+    for (const [index, wav] of [...r.failed]) await writePart(r, index, wav); // one more try for parts that failed
+    recording = null;
+    const missing = r.parts.filter((p) => p === null).length;
+    const text = JoCore.joinChunks(r.parts.map((p) => p ?? "[a part of the recording could not be written down]"));
+    storage.removeItem(REC_KEY);
+    hideRecPanel();
+    await makeReport(r.kind, text, r.started, Date.now(), missing);
+  }
+  function cancelReport() {
+    const r = recording;
+    if (r) closeRecording(r);
+    recording = null;
+    storage.removeItem(REC_KEY);
+    hideRecPanel();
+    setState("idle");
+  }
+
+  /** The transcript → Gemini's report → the app's checks → the CRM records it may belong to → an editable card. */
+  async function makeReport(kind, text, started, ended, missing = 0) {
+    const mins = Math.max(1, Math.round((ended - started) / 60000));
+    addMsg("me", `${kind === "call" ? "📞" : kind === "record" ? "⏺" : "📝"} ${REPORT_NAMES[kind]} · ${clock(ended - started)} ${kind === "record" ? "recorded" : "dictated"}`);
+    if (!text.replace(/\[a part[^\]]*\]/g, "").trim()) { addMsg("jo", "I didn't hear anything in that recording. Please try again.", { error: true }); setState("idle"); return; }
+    busy = true;
+    try {
+      setState("thinking", "WRITING THE REPORT…");
+      const tools = getAgent()?.tools || buildTools();
+      const team = tools.bridge ? await tools.team().catch(() => []) : [];
+      const now = new Date();
+      const raw = await new Gemini(settings.geminiKey, settings.geminiModel).json(JoCore.REPORT_SYSTEM,
+        JoCore.reportPrompt(kind, text, { now, team, me: settings.userName }));
+      const rep = JoCore.checkReport(raw, text, { kind, now, team, me: settings.userName });
+      if (kind === "record") { rep.start = started; rep.durationMin = mins; }
+      setState("thinking", "FINDING THE CUSTOMER IN CRM…");
+      rep.links = tools.bridge ? await tools.reportLinks(rep).catch(() => ({ contacts: [], related: [] })) : { contacts: [], related: [] };
+      Object.assign(rep, { id: `r${Date.now()}`, transcript: text, team, missing });
+      reports.set(rep.id, rep);
+      const who = rep.company || rep.person;
+      const say = `Here's the ${kind === "call" ? "call log" : "meeting report"}${who ? ` for ${who}` : ""}${rep.actions.length ? `, with ${rep.actions.length} ${rep.actions.length === 1 ? "task" : "tasks"}` : ""}. Check it and tap Save.`;
+      addMsg("jo", say, { cards: [{ kind: "report", id: rep.id }] });
+      speak(say);
+    } catch (e) {
+      addMsg("jo", `The report couldn't be written: ${e.message} What you said is kept below.`, { error: true });
+      addMsg("jo", text);
+      setState("error", "ERROR · SEE MESSAGE"); setTimeout(() => setState("idle"), 3000);
+    } finally { busy = false; }
+  }
+
+  function reportCard(c) {
+    const r = reports.get(c.id);
+    if (!r) return "";
+    const local = (ms) => { const d = new Date(ms); return `${JoCore.isoDate(d)}T${two(d.getHours())}:${two(d.getMinutes())}`; };
+    const options = (list) => list.map((o, i) => `<option value="${esc(`${o.module}:${o.id}`)}"${i === 0 ? " selected" : ""}>${esc(o.label)}</option>`).join("");
+    const owners = (a) => `<option value=""${a.self || !a.ownerId ? " selected" : ""}>Me</option>${r.team.map((u) => `<option value="${esc(u.id)}"${u.id === a.ownerId && !a.self ? " selected" : ""}>${esc(u.name)}</option>`).join("")}`;
+    const text = JoCore.reportText(r);
+    return `<div class="card confirm-card report-card" data-report="${esc(r.id)}">
+      <div class="what">${esc(REPORT_NAMES[r.kind])} · edit anything, then Save. Nothing is in Zoho CRM yet.</div>
+      <label><span>Subject</span><input data-r="subject" value="${esc(r.subject)}"></label>
+      <label><span>Person</span><select data-r="contact"><option value="">Not linked</option>${options(r.links.contacts)}</select></label>
+      <label><span>Deal / account</span><select data-r="related"><option value="">Not linked</option>${options(r.links.related)}</select></label>
+      ${!r.links.contacts.length && !r.links.related.length && (r.company || r.person) ? `<div class="limit">⚠ "${esc(r.company || r.person)}" wasn't found in Zoho CRM. It will be saved without a customer link.</div>` : ""}
+      <div class="rep-row"><label><span>When</span><input type="datetime-local" data-r="start" value="${local(r.start)}"></label>
+        <label><span>Minutes</span><input type="number" min="1" max="600" data-r="duration" value="${r.durationMin}"></label>
+        ${r.kind === "call" ? `<label><span>Call</span><select data-r="callType"><option${r.callType === "Outbound" ? " selected" : ""}>Outbound</option><option${r.callType === "Inbound" ? " selected" : ""}>Inbound</option></select></label>` : ""}</div>
+      <textarea data-r="report" rows="${Math.min(22, text.split("\n").length + 2)}">${esc(text)}</textarea>
+      ${r.actions.length ? `<div class="what">Tasks to create in Zoho CRM (untick to skip)</div>${r.actions.map((a) => `
+        <div class="rep-task"><input type="checkbox" data-t="on" checked aria-label="Create this task"><input data-t="task" value="${esc(a.task)}" aria-label="Task">
+          <select data-t="owner" aria-label="Who">${owners(a)}</select><input type="date" data-t="due" value="${esc(a.due)}" aria-label="Due date">
+          <small class="quote">"${esc(a.quote)}"</small><input type="hidden" data-t="quote" value="${esc(a.quote)}"></div>`).join("")}` : ""}
+      ${r.dropped.length ? `<div class="limit">Left out ${r.dropped.length === 1 ? "an action item" : `${r.dropped.length} action items`} I couldn't find in your words: ${esc(r.dropped.join("; "))}. Add them by hand if they're right.</div>` : ""}
+      ${r.missing ? `<div class="limit">⚠ ${r.missing} part${r.missing === 1 ? "" : "s"} of the recording couldn't be written down (network or Gemini limit).</div>` : ""}
+      <details><summary>What was said (${r.transcript.split(/\s+/).length} words)</summary><div class="rep-transcript">${esc(r.transcript)}</div></details>
+      <div class="rep-msg"></div>
+      <div class="btns"><button class="btn primary" data-rep="save">Save to Zoho CRM</button><button class="btn" data-rep="email">Draft summary email</button><button class="btn" data-rep="discard">Discard</button></div>
+    </div>`;
+  }
+
+  /** What the card's boxes say, ready for the bridge. */
+  function reportPayload(card, r, force = false) {
+    const v = (k) => card.querySelector(`[data-r="${k}"]`)?.value.trim() ?? "";
+    const link = (k) => { const [module, id] = v(k).split(":"); return id ? { module, id } : null; };
+    const start = v("start") ? JoCore.parseLocal(v("start").replace("T", " ")) : r.start;
+    const tasks = [...card.querySelectorAll(".rep-task")].filter((row) => row.querySelector('[data-t="on"]').checked).map((row) => {
+      const t = (k) => row.querySelector(`[data-t="${k}"]`).value.trim();
+      return { subject: t("task"), due: t("due"), ownerId: t("owner"), description: `From the ${r.kind === "call" ? "call" : "meeting"} "${v("subject")}": "${t("quote")}"` };
+    }).filter((t) => t.subject);
+    return {
+      kind: r.kind === "call" ? "call" : "meeting", subject: v("subject"), start, durationMin: Number(v("duration")) || r.durationMin,
+      callType: v("callType") || r.callType, result: r.result, product: r.product, venue: r.venue,
+      contact: link("contact"), related: link("related"), report: v("report"),
+      transcript: r.kind === "record" ? r.transcript : "", tasks, force,
+    };
+  }
+
+  async function saveReport(card, force = false) {
+    const r = reports.get(card.dataset.report);
+    const tools = getAgent()?.tools || buildTools();
+    const msg = card.querySelector(".rep-msg");
+    if (!r || !tools.bridge) { msg.textContent = "Zoho isn't connected yet: fill in the office bridge in Settings."; return; }
+    card.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    msg.textContent = "Saving to Zoho CRM…";
+    try {
+      const res = await tools.saveReport(reportPayload(card, r, force));
+      if (res.duplicate) {
+        const d = res.duplicate[0];
+        msg.innerHTML = `A call with this person was already logged at ${esc(new Date(d.Call_Start_Time).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }))} ("${esc(d.Subject || "Call")}"). Save this one as well?
+          <div class="btns"><button class="btn primary" data-rep="force">Save anyway</button><button class="btn" data-rep="discard">Discard</button></div>`;
+        card.querySelectorAll(".btns > button").forEach((b) => { b.disabled = false; });
+        return;
+      }
+      reports.delete(r.id);
+      const rows = [{ name: `${res.module === "Calls" ? "Call" : "Meeting"}: ${reportPayload(card, r).subject}`, note: res.notes ? `report${res.notes > 1 ? " + transcript" : ""} saved as a note on the ${String(res.noteOn).replace(/s$/, "").toLowerCase()}` : "", link: res.link },
+        ...res.tasks.map((t) => ({ name: `Task: ${t.subject}`, note: t.ok ? "" : `not saved: ${t.error}`, link: t.link }))];
+      const failed = res.tasks.filter((t) => !t.ok).length;
+      const say = `Saved in Zoho CRM: the ${res.module === "Calls" ? "call" : "meeting"}${res.notes ? ", the report note" : ""}${res.tasks.length - failed ? ` and ${res.tasks.length - failed} ${res.tasks.length - failed === 1 ? "task" : "tasks"}` : ""}.${failed ? ` ${failed} ${failed === 1 ? "task" : "tasks"} could not be saved.` : ""}${res.noteError ? ` The note failed: ${res.noteError}` : ""}`;
+      card.remove();
+      addMsg("jo", say, { cards: [{ kind: "crm", title: "Saved in Zoho CRM", rows, count: `${rows.length} ${rows.length === 1 ? "record" : "records"}`, filters: [], at: Date.now() }] });
+      speak(say);
+      renderTasks();
+    } catch (e) {
+      msg.textContent = `Not saved: ${e.message}`;
+      card.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+    }
+  }
+
+  transcript.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-rep]");
+    if (!b) return;
+    const card = b.closest(".report-card");
+    const r = reports.get(card?.dataset.report);
+    if (b.dataset.rep === "save") saveReport(card);
+    else if (b.dataset.rep === "force") saveReport(card, true);
+    else if (b.dataset.rep === "discard") { reports.delete(card.dataset.report); card.remove(); }
+    else if (b.dataset.rep === "email" && r) {
+      const text = card.querySelector('[data-r="report"]').value;
+      ask(`Write a short summary email of this ${r.kind === "call" ? "call" : "meeting"} to ${r.attendeesThem.join(", ") || r.person || "the customer"} and save it as a draft. The report:\n${text}`);
+    }
+  });
+  $("rec-start").addEventListener("click", () => startRecordingReport("record", $("rec-source").value));
+  $("rec-stop").addEventListener("click", stopReport);
+  $("rec-cancel").addEventListener("click", cancelReport);
+  document.addEventListener("visibilitychange", async () => {
+    if (!recording) return;
+    if (document.visibilityState === "visible") {
+      try { recording.wake = await navigator.wakeLock?.request("screen"); } catch { /* fine */ }
+    }
+  });
+  window.addEventListener("beforeunload", (e) => { if (recording) { saveRecording(); e.preventDefault(); e.returnValue = ""; } });
+  /** A recording cut short by a reload: make the report from the parts already written down. */
+  function resumeRecording() {
+    const saved = readJson(REC_KEY, null);
+    if (!saved?.parts?.some((p) => p)) { storage.removeItem(REC_KEY); return; }
+    const card = document.createElement("div");
+    card.className = "msg jo";
+    card.innerHTML = `<div class="who">Jo Office</div><div class="bubble">A ${esc(REPORT_NAMES[saved.kind] || "recording").toLowerCase()} from ${esc(new Date(saved.started).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }))} was cut short. ${saved.parts.filter(Boolean).length} part(s) were written down.</div>
+      <div class="card confirm-card"><div class="btns"><button class="btn primary" data-resume="yes">Make the report</button><button class="btn" data-resume="no">Discard</button></div></div>`;
+    card.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-resume]"); if (!b) return;
+      card.remove();
+      storage.removeItem(REC_KEY);
+      if (b.dataset.resume === "yes") makeReport(saved.kind, JoCore.joinChunks(saved.parts), saved.started, Date.now());
+    });
+    transcript.appendChild(card);
   }
 
   /** The last 50 answers' timings, kept in this browser, to find what is slow (Settings shows a summary). */
@@ -3227,7 +3858,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     $("clock-time").textContent = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
     $("clock-date").textContent = d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     const part = d.getHours() < 12 ? "Good morning" : d.getHours() < 17 ? "Good afternoon" : "Good evening";
-    $("greeting").textContent = `· ${part}${settings.userName ? `, ${settings.userName}` : ""}`;
+    $("greeting").textContent = `· ${part}${callMe() ? `, ${callMe()}` : ""}`;
   }
 
   // ---------- notifications, reminders, brief schedule ----------
@@ -3484,7 +4115,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   });
   $("quick").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
-    if (b.hasAttribute("data-brief")) makeBrief(false); else ask(b.dataset.ask);
+    if (b.hasAttribute("data-brief")) makeBrief(false); else if (b.dataset.report) beginReport(b.dataset.report); else ask(b.dataset.ask);
   });
   $("play-brief").addEventListener("click", playBrief);
   $("dismiss-brief").addEventListener("click", markBriefPlayed);
@@ -3618,14 +4249,15 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   }
   applyTheme();
   setLang(settings.tamil); renderMute(); renderWake(); renderFullscreen(); renderSystems(); renderTasks(); tickClock(); setState("idle");
-  const hello = settings.userName ? `, ${settings.userName}` : "";
+  const hello = callMe() ? ` ${callMe()}` : "";
   const earlier = savedHistory().contents;
   if (earlier.length) {
     earlier.forEach((c) => addMsg(c.role === "model" ? "jo" : "me", c.role === "model" ? c.parts[0].text : plainAsk(c.parts[0].text)));
     addMsg("jo", settings.tamil ? "முந்தைய உரையாடலைத் தொடரலாம். புதிதாகத் தொடங்க 'New' அழுத்துங்கள்." : "Carrying on from our earlier conversation. Tap ⟲ New (above) to start fresh.");
   } else addMsg("jo", settings.geminiKey
-    ? (settings.tamil ? `வணக்கம்${hello}. நான் தயார்.` : `Good to see you${hello}. All systems ready. What do you need?`)
+    ? (settings.tamil ? `வணக்கம்${hello}. நான் தயார்.` : `Hi${hello}. All systems ready. What do you need?`)
     : `Welcome${hello}. Open Settings (the gear, top right), add your name and your free Gemini key, then connect Zoho.`);
+  resumeRecording();
   renderAgenda();
   // The Android app asks for this when Jo Office is opened by the assistant gesture or "Talk to Jo".
   const listenOnRequest = () => { if (!window.JoListenRequested) return; window.JoListenRequested = false; if (!rec) listen(); };
