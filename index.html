@@ -495,7 +495,15 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       <div class="voice-row"><label>English voice<select id="voice-en"></select></label><button class="test" data-preview="en">▶ Preview</button></div>
       <div class="voice-row"><label>Tamil voice<select id="voice-ta"></select></label><button class="test" data-preview="ta">▶ Preview</button></div>
       <label class="row"><input type="checkbox" data-setting="fastVoice"> Fast replies: answer at once in the phone/PC voice (the Gemini voice takes a few seconds; it's kept for the morning brief)</label>
-      <label>Pause that ends your turn (seconds)<input type="number" min="0.8" max="5" step="0.1" data-setting="pauseSeconds"></label>
+      <label>How Jo knows you've finished
+        <select data-setting="endMode">
+          <option value="word">When I say an end word (pauses to breathe or think are fine)</option>
+          <option value="pause">When I pause</option>
+          <option value="tap">Only when I tap the mic</option>
+        </select></label>
+      <label>End words (separate with commas)<input data-setting="endWords" spellcheck="false"></label>
+      <p class="hint">End-word mode: talk, pause, think, carry on. Jo sends when you say an end word, like "…and remind me tomorrow, over", or when you tap the mic. The end word itself is left out. After 12 seconds of silence Jo stops and puts what you said in the box for you to send. In any mode: say "hold on" to keep Jo listening through a long pause, or "cancel that" to drop what you said.</p>
+      <label>Pause that ends your turn, in pause mode (seconds)<input type="number" min="0.8" max="5" step="0.1" data-setting="pauseSeconds"></label>
       <p class="hint">Jo Office waits this long after you stop talking (twice as long if you trail off with "and…", "the…"). Raise it if it still answers too early. Tap the mic to send at once.</p>
       <label class="row"><input type="checkbox" data-setting="geminiEars"> Better listening: Gemini also hears your voice and writes down what you said (understands accents and names much better; adds about a second)</label>
       <label>Names and words to recognise (customers, colleagues, products; separate with commas)
@@ -2701,7 +2709,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     userName: "", callMe: "KK", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
     tamil: false, speak: true,
     voiceEngine: "gemini", fastVoice: true, geminiVoiceEn: "Charon", geminiVoiceTa: "Kore", pcVoiceEn: "", pcVoiceTa: "", ttsModel: "",
-    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 2, conversation: true, voiceReview: true, writerEngine: "gemini", openaiKey: "", openaiModel: "", claudeKey: "", geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
+    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 2, endMode: "word", endWords: "over, that's it, that's all, send it, go ahead, full stop, அவ்வளவுதான்", conversation: true, voiceReview: true, writerEngine: "gemini", openaiKey: "", openaiModel: "", claudeKey: "", geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
@@ -3230,6 +3238,17 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   // Tapping the mic or the core sends at once.
   const pauseMs = () => Math.min(Math.max(Number(settings.pauseSeconds) || 2, 0.8), 5) * 1000;
   const UNFINISHED = /\b(and|or|but|so|because|the|a|an|to|for|of|in|on|at|with|from|my|your|is|are|about|then|also|um+|uh+|er+)\s*$|(மற்றும்|அல்லது|ஆனால்|பிறகு)\s*$/i;
+  // Saying an end word ("…, over") sends; "hold on" keeps listening through a long pause; "cancel that" drops it.
+  const escRe = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const endWordsRe = () => {
+    const ws = String(settings.endWords || "").split(",").map((w) => w.trim()).filter(Boolean).map(escRe);
+    return ws.length ? new RegExp(`(?:^|[\\s,.!?])(?:${ws.join("|")})[\\s,.!?]*$`, "i") : null;
+  };
+  const HOLD_ON = /\b(hold on|wait a (minute|moment|second)|one (minute|moment|second)|let me think)[\s,.!?]*$|(இருங்க|ஒரு நிமிஷம்)[\s,.!?]*$/i;
+  const CANCEL_THAT = /\b(cancel that|scratch that|forget it|never ?mind)[\s,.!?]*$/i;
+  const stripEndWord = (t) => { const re = endWordsRe(); return re ? t.replace(re, "").replace(/[\s,]+$/, "").trim() : t; };
+  const LONG_SILENCE_MS = 12000; // end-word mode: stop after this much silence and let you check
+  const TAP_SILENCE_MS = 60000;  // tap mode
   const FIRST_WORD_MS = 8000; // time to start speaking after tapping the mic
   const FOLLOW_UP_MS = 6000;  // conversation mode: time to start a follow-up before standing by
   let rec = null, finishListening = null, cancelListening = null;
@@ -3244,6 +3263,13 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     await stopWake();
     if (rec) return;
     const recording = startRecording(); // in parallel, so the recogniser isn't held up
+    const mode = ["word", "pause", "tap"].includes(settings.endMode) ? settings.endMode : "word";
+    const firstEnd = (String(settings.endWords || "").split(",")[0] || "").trim();
+    const how = mode === "word" && firstEnd ? `LISTENING… SAY "${firstEnd.toUpperCase()}" OR TAP TO SEND` : "LISTENING… TAP TO SEND";
+    let hold = false, endedBy = "", endTimer = null; // hold: "hold on" was said, so pauses don't end the turn
+    // How long a silence (in your voice and the browser's words) ends the turn.
+    const gap = () => mode === "tap" ? TAP_SILENCE_MS : mode === "word" || hold ? LONG_SILENCE_MS
+      : UNFINISHED.test(text()) ? pauseMs() * 2 : pauseMs();
     let recNow = null, voicePoll = null;
     recording.then((r) => {
       recNow = r;
@@ -3251,8 +3277,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       if (r) voicePoll = setInterval(() => {
         if (finished) { clearInterval(voicePoll); return; }
         const quiet = r.lastVoice() ? performance.now() - r.lastVoice() : 0;
-        const long = UNFINISHED.test(text()) ? pauseMs() * 2 : pauseMs();
-        if (r.spoke() && quiet > long) finish();
+        if (r.spoke() && quiet > gap()) finish(mode === "pause" && !hold ? "pause" : "silence");
       }, 200);
     });
     const input = $("ask-input");
@@ -3267,19 +3292,20 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       clearTimeout(silence);
       silence = setTimeout(() => {
         const quiet = recNow?.lastVoice() ? performance.now() - recNow.lastVoice() : Infinity;
-        if (quiet < pauseMs()) waitFor(pauseMs() - quiet + 50);
-        else finish();
+        if (quiet < gap()) waitFor(gap() - quiet + 50);
+        else finish(text() ? (mode === "pause" && !hold ? "pause" : "silence") : "");
       }, ms);
     };
-    function finish() {
+    function finish(why = "tap") {
       if (finished) return;
       finished = true;
-      clearTimeout(silence);
+      endedBy = why;
+      clearTimeout(silence); clearTimeout(endTimer);
       try { rec?.stop(); } catch { /* already stopped */ }
     }
     let cancelled = false;
-    finishListening = finish;
-    cancelListening = () => { cancelled = true; finish(); };
+    finishListening = () => finish("tap");
+    cancelListening = () => { cancelled = true; finish("cancel"); };
     const done = async () => {
       clearTimeout(silence); clearInterval(voicePoll);
       rec = null; finishListening = cancelListening = null;
@@ -3297,13 +3323,19 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       const said = recorded && (rest || voiceOnly) ? `${prefix} ${await understand(recorded, rest)}`.trim() : heard;
       recorded?.discard();
       if (!said) { setState("idle"); toast("I couldn't make out what you said. Please try again."); return; }
-      const fixed = learned.apply(said); // learned corrections, even if Gemini missed one
-      lastHeard = heard && heard !== fixed ? heard : ""; // the browser's version, as a second opinion for Jo
-      if (!review()) { input.value = ""; ask(fixed, { voice: true }); return; }
+      // "…cancel that" heard by Gemini even if the browser missed it.
+      if (CANCEL_THAT.test(said)) { input.value = draft; setState("idle", "Dropped · nothing sent"); return; }
+      if (endedBy === "silence" && endWordsRe()?.test(said)) endedBy = "word";
+      const fixed = learned.apply(stripEndWord(said)); // learned corrections, even if Gemini missed one
+      if (!fixed) { input.value = draft; setState("idle"); return; }
+      lastHeard = heard && stripEndWord(heard) !== fixed ? stripEndWord(heard) : ""; // the browser's version, as a second opinion for Jo
+      // A long silence without an end word: you may not have finished, so the words wait in the box.
+      const check = review() || endedBy === "silence";
+      if (!check) { input.value = ""; ask(fixed, { voice: true }); return; }
       // Like typing: the words wait in the box to be checked or edited, and Enter sends them.
       input.value = `${draft} ${fixed}`.trim();
       voiceDraft = input.value;
-      setState("idle", "Check the text · Enter to send");
+      setState("idle", endedBy === "silence" ? "Stopped after a long silence · Enter to send" : "Check the text · Enter to send");
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     };
@@ -3315,7 +3347,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       r.maxAlternatives = 1;
       current = ""; interim = "";
       r.onstart = () => {
-        setState("listening", followUp && !text() ? "LISTENING FOR A FOLLOW-UP…" : "LISTENING… TAP TO SEND");
+        setState("listening", followUp && !text() ? "LISTENING FOR A FOLLOW-UP…" : hold ? "HOLDING ON… CARRY ON WHEN READY" : how);
         $("mic").classList.add("live");
       };
       r.onresult = (e) => {
@@ -3324,9 +3356,17 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
           if (e.results[i].isFinal) fin += `${e.results[i][0].transcript} `; else mid += e.results[i][0].transcript;
         }
         current = fin; interim = mid;
-        input.value = text();
+        const now = text();
+        input.value = now;
+        clearTimeout(endTimer);
+        if (CANCEL_THAT.test(now)) { endTimer = setTimeout(() => { if (CANCEL_THAT.test(text())) cancelListening?.(); }, 600); return; }
+        // An end word sends, once you've stopped for a moment (so "over" in "over the phone" doesn't).
+        const re = endWordsRe();
+        if (re && mode !== "tap" && re.test(now)) { endTimer = setTimeout(() => { if (re.test(text())) finish("word"); }, 700); }
+        if (HOLD_ON.test(now) && !hold) { hold = true; setState("listening", "HOLDING ON… CARRY ON WHEN READY"); }
+        else if (hold && !HOLD_ON.test(now)) setState("listening", how);
         // Every new word restarts the countdown; unfinished-sounding words get extra time.
-        waitFor(UNFINISHED.test(text()) ? pauseMs() * 2 : pauseMs());
+        waitFor(gap());
       };
       r.onerror = (e) => {
         if (e.error === "not-allowed" || e.error === "service-not-allowed") {
