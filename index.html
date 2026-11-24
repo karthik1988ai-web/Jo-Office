@@ -2791,6 +2791,17 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
+  // Moving from the older Jo at the same web address (and in the phone app): keep the Gemini key
+  // and voice choices once. Its bridge was a different one, so the bridge settings start fresh.
+  if (!storage.getItem("office.settings")) {
+    const old = readJson("jo.settings", null);
+    if (old && typeof old === "object") {
+      for (const k of ["geminiKey", "geminiModel", "tamil", "speak", "voiceEngine", "fastVoice", "geminiVoiceEn", "geminiVoiceTa", "pcVoiceEn", "pcVoiceTa", "ttsModel", "wakeWord", "briefEnabled", "briefTime", "mailCheckMinutes", "announceMail"]) {
+        if (old[k] !== undefined && old[k] !== "") settings[k] = old[k];
+      }
+      saveSettings();
+    }
+  }
   const userName = () => settings.userName || "there";
   /** What Jo calls the user ("KK"); the full name is still used to sign emails. */
   const callMe = () => String(settings.callMe ?? "").trim() || settings.userName || "";
