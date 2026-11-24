@@ -979,6 +979,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         learned.length ? `This speaker has corrected these before (was written → what they meant): ${learned.slice(-60).map((x) => `"${x.heard}" → "${x.meant}"`).join("; ")}.` : "",
         context ? `The conversation so far (the speaker is probably continuing it):\n${context}` : "",
         heard ? `A rough automatic transcript, which may have mistakes: "${heard}"` : "",
+        "When a word is unclear, write the word that makes sense in this conversation (a customer, product or colleague name from the lists above, or ordinary business words), not an unrelated word that only sounds similar.",
         "Reply with only the spoken words: no quotes, labels or notes. If nothing is said, reply with nothing.",
       ].filter(Boolean).join("\n");
       const json = await this.request(
@@ -2405,9 +2406,11 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       return this.tamil ? `வணக்கம் ${n}, ${reply}` : `Hi ${n}, ${rest}`;
     }
 
-    async ask(text, onTool = () => {}, onCards = () => {}) {
+    async ask(text, onTool = () => {}, onCards = () => {}, { voice = false, heardAs = "" } = {}) {
       const fresh = !this.contents.length;
-      const reply = await this.answer(text, onTool, onCards);
+      // Only Gemini sees this note; "yes"/"no" checks and the email writer get your words as they are.
+      const note = voice ? `[Spoken; speech-to-text may have misheard some words${heardAs ? `. The browser's recogniser heard: "${heardAs}"` : ""}]\n` : "";
+      const reply = await this.answer(text, onTool, onCards, note);
       return fresh ? this.greet(reply) : reply;
     }
     reset() { this.contents = []; this.tools.cancel(); }
@@ -2423,6 +2426,11 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         "Your reply is also shown on screen, so write every number in digits, never in words: amounts as ₹1,20,000 or ₹500 (Indian grouping),",
         "counts (14 orders), percentages (3%), and invoice, order and reference numbers, codes and subjects exactly as they appear (RRR.0391).",
         'Dates and times naturally ("tomorrow at 5 PM", "31 Oct"). The app speaks the digits correctly, so never spell them out.',
+        "",
+        "Messages marked [Spoken] came through speech-to-text and may contain misheard words: sound-alikes, split or joined words,",
+        "names spelled wrongly (\"Uflex\" as \"you flex\", \"Jadav\" as \"Jadhav\" or \"Yadav\"). Work out what the user means from the",
+        "conversation, their team, customers and products, the way a person listening would. If a name isn't found, search again with",
+        "a shorter part or another likely spelling before saying it doesn't exist. Ask only when two meanings are really possible.",
         "",
         "Use the functions to look things up rather than guessing. To act on a CRM record, find it first with crm_search.",
         "Changes (sending mail, creating or updating CRM records, expenses, calendar events) are never done straight away:",
@@ -2515,14 +2523,14 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
      * One request; [onTool] is told which tool is running (for the HUD), [onCards] gets the cards as
      * soon as the data is in, before the answer is written.
      */
-    async answer(text, onTool = () => {}, onCards = () => {}) {
+    async answer(text, onTool = () => {}, onCards = () => {}, note = "") {
       this.trimHistory();
       this.tools.sources = [];
       this.tools.listed = [];
       const stats = this.lastStats = { think: 0, data: 0, calls: 0, shortcut: "" }; // seconds in Gemini and in lookups; Gemini calls
       // A change is waiting: a plain "yes" runs it and a plain "no" drops it, without asking Gemini.
       // Anything else is a correction ("no, the name is Ravi Kumar"): Gemini proposes it again.
-      let prompt = text;
+      let prompt = `${note}${text}`;
       if (this.tools.pending) {
         this.tools.pending.fresh = false;
         if (isYes(text)) {
@@ -2541,14 +2549,14 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
           return reply;
         }
         const waiting = this.tools.cancel();
-        prompt = `[This change was waiting for my yes: ${waiting.summary} It has NOT been done. If my reply corrects or changes it, propose the corrected change again; otherwise drop it.]\n${text}`;
+        prompt = `[This change was waiting for my yes: ${waiting.summary} It has NOT been done. If my reply corrects or changes it, propose the corrected change again; otherwise drop it.]\n${note}${text}`;
       }
       this.tools.request = text;
       this.tools.context = this.recentText(6);
       const userTurn = Gemini.userText(`[Now: ${this.now()}]\n${prompt}`);
       // Common questions ("check my mail", "my tasks", "today's meetings"): the data is fetched straight away
       // instead of Gemini first deciding to fetch it, which saves one round trip.
-      const shortcut = prompt === text ? shortcutFor(text) : null;
+      const shortcut = prompt === `${note}${text}` ? shortcutFor(text) : null; // not while a change waits
       if (shortcut) {
         onTool(shortcut.name);
         const t = Date.now();
@@ -2693,7 +2701,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     userName: "", callMe: "KK", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
     tamil: false, speak: true,
     voiceEngine: "gemini", fastVoice: true, geminiVoiceEn: "Charon", geminiVoiceTa: "Kore", pcVoiceEn: "", pcVoiceTa: "", ttsModel: "",
-    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 1.5, conversation: true, voiceReview: true, writerEngine: "gemini", openaiKey: "", openaiModel: "", claudeKey: "", geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
+    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 2, conversation: true, voiceReview: true, writerEngine: "gemini", openaiKey: "", openaiModel: "", claudeKey: "", geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
@@ -3165,7 +3173,18 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       const source = ctx.createMediaStreamSource(stream);
       const node = ctx.createScriptProcessor(4096, 1, 1);
       const pieces = [];
-      node.onaudioprocess = (e) => pieces.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      // Your voice level, so Jo knows you're still talking even when the browser's recogniser
+      // catches no words (it often misses Indian accents and names). The noise floor adapts to the room.
+      let floor = 0.003, lastVoice = 0, voiced = 0;
+      node.onaudioprocess = (e) => {
+        const data = e.inputBuffer.getChannelData(0);
+        pieces.push(new Float32Array(data));
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+        const rms = Math.sqrt(sum / data.length);
+        if (rms > Math.max(floor * 3, 0.012)) { lastVoice = performance.now(); voiced++; }
+        else floor = rms < floor ? rms : floor + (rms - floor) * 0.02;
+      };
       source.connect(node);
       node.connect(ctx.destination); // needed for the node to run; it outputs silence
       let released = false;
@@ -3176,7 +3195,13 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         ctx.close().catch(() => {});
         releaseMicLater(); // the microphone itself stays open for the next question
       };
-      return { discard: release, finish() { release(); return JoCore.encodeWav(pieces, ctx.sampleRate); } };
+      return {
+        discard: release,
+        finish() { release(); return JoCore.encodeWav(pieces, ctx.sampleRate); },
+        lastVoice: () => lastVoice,                   // when you last made a sound
+        spoke: () => voiced >= 4,                     // about a third of a second of voice in all
+        seconds: () => (pieces.length * 4096) / ctx.sampleRate,
+      };
     } catch {
       return null; // microphone busy or not allowed: the browser's text is used
     }
@@ -3186,10 +3211,12 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     const wav = recording.finish();
     if (!wav) return heard;
     setState("thinking", "UNDERSTANDING…");
+    // Long speech takes Gemini longer: wait 8 s plus 1 s for every 4 s you spoke (at most 25 s).
+    const wait = Math.min(25000, 8000 + (recording.seconds() / 4) * 1000);
     try {
       const text = await Promise.race([
         new Gemini(settings.geminiKey, settings.geminiModel).transcribe(wav, "audio/wav", { hints: speechHints(), tamil: settings.tamil, heard, learned: learned.all(), context: agent?.recentText() || "" }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("slow")), 8000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("slow")), wait)),
       ]);
       return text || heard;
     } catch {
@@ -3201,13 +3228,14 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   // listening (restarting it when the browser stops on its own) until you have really finished.
   // A pause ends your turn, and a longer one is allowed when your last words sound unfinished.
   // Tapping the mic or the core sends at once.
-  const pauseMs = () => Math.min(Math.max(Number(settings.pauseSeconds) || 1.5, 0.8), 5) * 1000;
+  const pauseMs = () => Math.min(Math.max(Number(settings.pauseSeconds) || 2, 0.8), 5) * 1000;
   const UNFINISHED = /\b(and|or|but|so|because|the|a|an|to|for|of|in|on|at|with|from|my|your|is|are|about|then|also|um+|uh+|er+)\s*$|(மற்றும்|அல்லது|ஆனால்|பிறகு)\s*$/i;
   const FIRST_WORD_MS = 8000; // time to start speaking after tapping the mic
   const FOLLOW_UP_MS = 6000;  // conversation mode: time to start a follow-up before standing by
   let rec = null, finishListening = null, cancelListening = null;
   const review = () => settings.voiceReview !== false;
   let voiceDraft = null; // spoken words waiting in the box; editing them teaches Jo the right words
+  let lastHeard = ""; // what the browser heard, when Gemini wrote it differently
   async function listen(prefix = "", { followUp = false } = {}) {
     if (rec) { finishListening?.(); return; }
     if (!Recognition) { toast("Voice input needs Chrome or Edge. You can still type."); return; }
@@ -3216,13 +3244,33 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     await stopWake();
     if (rec) return;
     const recording = startRecording(); // in parallel, so the recogniser isn't held up
+    let recNow = null, voicePoll = null;
+    recording.then((r) => {
+      recNow = r;
+      // Once you've spoken, a real pause in your voice ends the turn, even if the browser caught no words.
+      if (r) voicePoll = setInterval(() => {
+        if (finished) { clearInterval(voicePoll); return; }
+        const quiet = r.lastVoice() ? performance.now() - r.lastVoice() : 0;
+        const long = UNFINISHED.test(text()) ? pauseMs() * 2 : pauseMs();
+        if (r.spoke() && quiet > long) finish();
+      }, 200);
+    });
     const input = $("ask-input");
     const draft = review() ? input.value.trim() : ""; // talking again adds to what's waiting in the box
     let spoken = prefix ? `${prefix} ` : ""; // text from recognisers that already ended
     let current = "", interim = "";
     let finished = false, silence = null;
     const text = () => `${draft} ${spoken}${current}${interim}`.replace(/\s+/g, " ").trim();
-    const waitFor = (ms) => { clearTimeout(silence); silence = setTimeout(finish, ms); };
+    // The pause is judged from your voice itself as well as the browser's words: while you're
+    // still making sound (even words the browser didn't catch), Jo keeps listening.
+    const waitFor = (ms) => {
+      clearTimeout(silence);
+      silence = setTimeout(() => {
+        const quiet = recNow?.lastVoice() ? performance.now() - recNow.lastVoice() : Infinity;
+        if (quiet < pauseMs()) waitFor(pauseMs() - quiet + 50);
+        else finish();
+      }, ms);
+    };
     function finish() {
       if (finished) return;
       finished = true;
@@ -3233,20 +3281,24 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     finishListening = finish;
     cancelListening = () => { cancelled = true; finish(); };
     const done = async () => {
-      clearTimeout(silence);
+      clearTimeout(silence); clearInterval(voicePoll);
       rec = null; finishListening = cancelListening = null;
       if (cancelled) spoken = "";
       $("mic").classList.remove("live");
       input.value = draft;
       const heard = spoken.replace(/\s+/g, " ").trim();
       const recorded = await recording;
-      if (!heard) { recorded?.discard(); setState("idle"); return; }
-      if (review()) input.value = `${draft} ${heard}`.trim(); // shown while Gemini listens again
+      // The browser caught nothing, but you did speak: Gemini still listens to the recording.
+      const voiceOnly = !cancelled && !heard && recorded?.spoke();
+      if (!heard && !voiceOnly) { recorded?.discard(); setState("idle"); return; }
+      if (review() && heard) input.value = `${draft} ${heard}`.trim(); // shown while Gemini listens again
       // The wake-word words came before the recording started, so they're kept as heard.
       const rest = heard.slice(prefix.length).trim();
-      const said = recorded && rest ? `${prefix} ${await understand(recorded, rest)}`.trim() : heard;
+      const said = recorded && (rest || voiceOnly) ? `${prefix} ${await understand(recorded, rest)}`.trim() : heard;
       recorded?.discard();
+      if (!said) { setState("idle"); toast("I couldn't make out what you said. Please try again."); return; }
       const fixed = learned.apply(said); // learned corrections, even if Gemini missed one
+      lastHeard = heard && heard !== fixed ? heard : ""; // the browser's version, as a second opinion for Jo
       if (!review()) { input.value = ""; ask(fixed, { voice: true }); return; }
       // Like typing: the words wait in the box to be checked or edited, and Enter sends them.
       input.value = `${draft} ${fixed}`.trim();
@@ -3407,7 +3459,9 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       transcript.scrollTop = transcript.scrollHeight;
     };
     try {
-      const reply = await a.ask(text, (tool) => { used.push(tool); setState("thinking", TOOL_LABELS[tool] || "PROCESSING…"); }, showEarly);
+      const heardAs = voice && lastHeard ? lastHeard : "";
+      lastHeard = "";
+      const reply = await a.ask(text, (tool) => { used.push(tool); setState("thinking", TOOL_LABELS[tool] || "PROCESSING…"); }, showEarly, { voice, heardAs });
       early?.remove();
       addMsg("jo", reply, { tools: used, stats: a.lastStats || { think: (performance.now() - t0) / 1000, data: 0 }, confirm: a.tools.pending?.name, pending: a.tools.pending, cards: a.tools.sources });
       if (!a.tools.pending) document.querySelectorAll(".msg .confirm-card").forEach((c) => c.remove());
