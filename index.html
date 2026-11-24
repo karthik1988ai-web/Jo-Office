@@ -148,6 +148,10 @@ svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
 .limit { color: var(--warn); font-size: 12px; margin-top: 6px; }
 .mailrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
 .mailrow:first-child { border-top: 0; }
+.reply-ask { grid-column: 1 / -1; margin-top: 4px; }
+.reply-ask textarea { display: block; width: 100%; margin: 0 0 6px; padding: 6px 8px; background: var(--card-2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; outline: none; }
+.reply-ask textarea:focus { border-color: var(--acc); }
+.reply-ask .hint { margin: 0 0 6px; font-size: 12px; color: var(--muted); }
 .mailrow .who2 { font-weight: 500; font-size: 13px; }
 .mailrow .subj { color: var(--sub); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
@@ -2157,6 +2161,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
         "Never invent facts, figures, promises or dates the sender didn't give. If something essential is missing, so that the email",
         "would be wrong or useless without it (for example the amount for a payment reminder, or which meeting to confirm), don't write",
         "the email: ask one short question instead.",
+        reply ? "If the sender gave their own points for the reply, those points are the answer: say each of them clearly, keep their meaning, and add no answers, promises, prices or dates beyond them." : "",
         reply ? "This is a reply: answer each point and question in the email being answered, refer to its details (numbers, dates, names) where it helps, don't repeat it, and keep \"Re:\" with its subject. The original is quoted below your reply automatically, so don't quote it." : "",
         style ? `How ${name} writes (follow this closely, it was learned from their own emails and edits):\n${style}` : "",
         'Reply with JSON only: {"subject": "...", "body": "..."} or {"question": "..."}.',
@@ -2844,7 +2849,12 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     return `<div class="card"><div class="card-head"><span>${esc(c.title)}</span><small>${c.rows.length}</small></div>${c.rows.slice(0, 8).map((m) => `
       <div class="mailrow"><div style="min-width:0"><div class="who2">${esc(m.from)}</div><div class="subj">${esc(m.subject || "(no subject)")}</div></div>
         <div class="btns"><button class="btn" data-ask="${esc(`Read me the email from ${m.from} with subject "${m.subject}"`)}">Read</button>
-        <button class="btn" data-ask="${esc(`Draft a reply to the email from ${m.from} about "${m.subject}"`)}">Draft reply</button></div></div>`).join("")}</div>`;
+        <button class="btn" data-reply>Draft reply</button></div>
+        <form class="reply-ask" hidden data-from="${esc(m.from)}" data-subject="${esc(m.subject)}">
+          <p class="hint">Your points for the reply: what to say, agree, refuse or ask. Jo writes it properly around them.</p>
+          <textarea rows="3" aria-label="Your points for the reply" placeholder="e.g. Yes, we can deliver by 5 Dec. Price stays the same. Ask them to send the PO."></textarea>
+          <div class="btns"><button type="submit" class="btn primary">Write the reply</button><button type="button" class="btn" data-reply-cancel>Cancel</button></div>
+        </form></div>`).join("")}</div>`;
   }
   function calendarCard(c) {
     if (!c.rows.length) return "";
@@ -4147,7 +4157,31 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   $("refresh-agenda").addEventListener("click", () => renderAgenda(true));
   $("refresh-tasks").addEventListener("click", () => renderTasks(true));
   // Buttons inside answer cards (Read, Draft reply, Yes, Cancel…) ask just like typing it.
+  // "Draft reply" first asks for your points, so the reply says what you decide.
+  const sendReplyPoints = (form) => {
+    const points = form.querySelector("textarea").value.trim();
+    if (!points) { form.querySelector("textarea").focus(); toast("Type your points for the reply first."); return; }
+    form.hidden = true;
+    ask(`Draft a reply to the email from ${form.dataset.from} about "${form.dataset.subject}". My points for the reply: ${points}`);
+  };
+  transcript.addEventListener("submit", (e) => {
+    const form = e.target.closest("form.reply-ask"); if (!form) return;
+    e.preventDefault(); sendReplyPoints(form);
+  });
+  transcript.addEventListener("keydown", (e) => {
+    const form = e.target.closest?.("form.reply-ask");
+    if (form && e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendReplyPoints(form); }
+  });
   transcript.addEventListener("click", (e) => {
+    const r = e.target.closest("button[data-reply]");
+    if (r) {
+      const form = r.closest(".mailrow").querySelector("form.reply-ask");
+      form.hidden = !form.hidden;
+      if (!form.hidden) form.querySelector("textarea").focus();
+      return;
+    }
+    const rc = e.target.closest("button[data-reply-cancel]");
+    if (rc) { rc.closest("form.reply-ask").hidden = true; return; }
     const b = e.target.closest("button[data-ask]");
     if (b) { b.closest(".confirm-card, .choice-card")?.remove(); ask(b.dataset.ask); }
     const act = e.target.closest("button[data-act]");
