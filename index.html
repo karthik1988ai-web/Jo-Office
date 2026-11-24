@@ -2791,8 +2791,9 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
-  // Moving from the older Jo at the same web address (and in the phone app): keep the Gemini key
-  // and voice choices once. Its bridge was a different one, so the bridge settings start fresh.
+  // Jo (the separate voice app) lives on the same site, karthik1988ai-web.github.io, so its saved
+  // settings are readable here: on the first start, borrow its Gemini key and voice choices once.
+  // Its bridge is a different one, so the bridge settings start fresh. Jo's own settings are untouched.
   if (!storage.getItem("office.settings")) {
     const old = readJson("jo.settings", null);
     if (old && typeof old === "object") {
