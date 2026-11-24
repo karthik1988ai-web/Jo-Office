@@ -866,6 +866,40 @@ export function createHandler(env: Env = (n) => Deno.env.get(n), http: typeof fe
     throw new Error(`Gemini: ${last}`);
   }
 
+  // ---- Your rules: standing instructions Jo follows every time (settings key jo_rules, a JSON list) ----
+  type Rule = { id: string; text: string; at: number };
+  async function getRules(): Promise<Rule[]> {
+    try {
+      const v = JSON.parse(await getSetting("jo_rules") || "[]");
+      return Array.isArray(v) ? v.filter((r) => r && typeof r.id === "string" && typeof r.text === "string" && r.text.trim()) : [];
+    } catch { return []; }
+  }
+  const MAX_RULES = 60;
+  const saveRules = (list: Rule[]) => setSetting("jo_rules", JSON.stringify(list.slice(0, MAX_RULES)));
+
+  // ---- Searching what was said on earlier days (jo_activity) ----
+  const SEARCH_SKIP = new Set("the and for with from what when did about this that have has had was were are you your our my his her their them they say said tell told ask asked last month week day days ago jo".split(" "));
+  async function searchHistory(query: string, from: string, to: string, limit: number) {
+    // Plain words only, so nothing in the question can change the database query.
+    const words = [...new Set((query.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) ?? []).filter((w) => !SEARCH_SKIP.has(w)))].slice(0, 8);
+    const parts = ["select=at,kind,text", "kind=in.(ask,report)", "order=at.desc", "limit=300"];
+    const day = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "");
+    if (day(from)) parts.push(`at=gte.${day(from)}T00:00:00%2B05:30`);
+    if (day(to)) parts.push(`at=lte.${day(to)}T23:59:59%2B05:30`);
+    if (words.length) parts.push(`or=(${words.map((w) => `text.ilike.*${encodeURIComponent(w)}*`).join(",")})`);
+    const found = await rows("jo_activity", parts.join("&"));
+    const scored = found.map((r) => {
+      const t = String(r.text ?? "").toLowerCase();
+      return { r, score: words.filter((w) => t.includes(w)).length };
+    });
+    scored.sort((a, b) => b.score - a.score || String(b.r.at).localeCompare(String(a.r.at)));
+    const [oldest] = await rows("jo_activity", "select=at&order=at.asc&limit=1").catch(() => [] as Json[]);
+    return {
+      words, total: found.length, historySince: oldest?.at ?? null,
+      matches: scored.slice(0, Math.min(Math.max(limit, 1), 20)).map(({ r }) => ({ at: r.at, kind: r.kind, text: clipText(r.text, 700) })),
+    };
+  }
+
   type ThinkState = { lastRun?: number; day?: string; calls?: number; styleDay?: string; lastError?: string };
   async function thinkState(): Promise<ThinkState> { try { return JSON.parse(await getSetting("jo_think") || "{}"); } catch { return {}; } }
 
@@ -1010,13 +1044,14 @@ export function createHandler(env: Env = (n) => Deno.env.get(n), http: typeof fe
 
       // Jo's memory
       case "memory_get": {
-        const [notes, suggestions, state] = await Promise.all([
+        const [notes, suggestions, state, rules] = await Promise.all([
           getSettings(["jo_facts", "jo_style", "gemini_key"]),
           rows("jo_suggestions", "select=id,at,kind,title,detail,say,ref&status=eq.new&order=at.desc&limit=12").catch(() => null),
           thinkState(),
+          getRules(),
         ]);
         return {
-          facts: notes.jo_facts ?? "", style: notes.jo_style ?? "", suggestions: suggestions ?? [], ready: suggestions !== null,
+          facts: notes.jo_facts ?? "", style: notes.jo_style ?? "", rules, suggestions: suggestions ?? [], ready: suggestions !== null,
           thinking: !!(notes.gemini_key || (env("GEMINI_API_KEY") ?? "").trim()), lastThink: state.lastRun ?? 0, lastError: state.lastError ?? "",
         };
       }
@@ -1025,6 +1060,43 @@ export function createHandler(env: Env = (n) => Deno.env.get(n), http: typeof fe
         await insert("jo_activity", { kind, text: clipText(body.text, 2000), meta: body.meta && typeof body.meta === "object" ? body.meta : {} });
         return { ok: true };
       }
+      // Your rules
+      case "rules_list":
+        return { rules: await getRules() };
+      case "rule_add": {
+        const text = clipText(String(body.text ?? "").replace(/\s+/g, " ").trim(), 500);
+        if (!text) throw new Error("What should the rule say?");
+        const list = await getRules();
+        const same = list.find((r) => r.text.toLowerCase() === text.toLowerCase());
+        if (same) return { rule: same, rules: list, existed: true };
+        if (list.length >= MAX_RULES) throw new Error(`There are already ${MAX_RULES} rules. Remove one first.`);
+        const rule = { id: crypto.randomUUID().slice(0, 8), text, at: Date.now() };
+        list.push(rule);
+        await saveRules(list);
+        return { rule, rules: list };
+      }
+      case "rule_update": {
+        const id = String(body.id ?? ""), text = clipText(String(body.text ?? "").replace(/\s+/g, " ").trim(), 500);
+        const list = await getRules();
+        const rule = list.find((r) => r.id === id);
+        if (!rule) throw new Error("That rule wasn't found.");
+        if (!text) throw new Error("What should the rule say?");
+        rule.text = text; rule.at = Date.now();
+        await saveRules(list);
+        return { rule, rules: list };
+      }
+      case "rule_delete": {
+        const id = String(body.id ?? "");
+        const list = await getRules();
+        const rule = list.find((r) => r.id === id);
+        if (!rule) throw new Error("That rule wasn't found.");
+        const rest = list.filter((r) => r.id !== id);
+        await saveRules(rest);
+        return { removed: rule, rules: rest };
+      }
+      // What was said on earlier days
+      case "memory_search":
+        return await searchHistory(String(body.query ?? ""), String(body.from ?? ""), String(body.to ?? ""), Number(body.limit) || 10);
       case "suggestion_update": {
         const id = String(body.id ?? "").replace(/\D/g, "");
         if (!id) throw new Error("Which suggestion?");
