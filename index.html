@@ -501,8 +501,9 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
           <option value="pause">When I pause</option>
           <option value="tap">Only when I tap the mic</option>
         </select></label>
-      <label>End words (separate with commas)<input data-setting="endWords" spellcheck="false"></label>
-      <p class="hint">End-word mode: talk, pause, think, carry on. Jo sends when you say an end word, like "…and remind me tomorrow, over", or when you tap the mic. The end word itself is left out. After 12 seconds of silence Jo stops and puts what you said in the box for you to send. In any mode: say "hold on" to keep Jo listening through a long pause, or "cancel that" to drop what you said.</p>
+      <label class="row"><input type="checkbox" data-setting="joEnds"> Say "Jo" again to finish: "Jo … what you want … Jo" (a falling chime means Jo stopped listening)</label>
+      <label>Other end words (separate with commas)<input data-setting="endWords" spellcheck="false"></label>
+      <p class="hint">End-word mode: talk, pause, think, carry on. Jo sends when you say "Jo" again or another end word, like "Jo, send Ravi the rate list and remind me tomorrow, Jo", or when you tap the mic. The end word itself is left out. After 12 seconds of silence Jo stops and puts what you said in the box for you to send. In any mode: say "hold on" to keep Jo listening through a long pause, or "cancel that" to drop what you said.</p>
       <label>Pause that ends your turn, in pause mode (seconds)<input type="number" min="0.8" max="5" step="0.1" data-setting="pauseSeconds"></label>
       <p class="hint">Jo Office waits this long after you stop talking (twice as long if you trail off with "and…", "the…"). Raise it if it still answers too early. Tap the mic to send at once.</p>
       <label class="row"><input type="checkbox" data-setting="geminiEars"> Better listening: Gemini also hears your voice and writes down what you said (understands accents and names much better; adds about a second)</label>
@@ -511,7 +512,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       <p class="hint">Mail senders are added automatically. Misheard anyway? Say "no, I said …", or click your message in the conversation to fix it and send again. Jo Office remembers the fix from then on.</p>
       <label>Learned words (corrections you made)</label>
       <ul class="learned" id="learned-list"></ul>
-      <label class="row"><input type="checkbox" data-setting="voiceReview"> Check before sending: what you say appears in the text box so you can edit it; press Enter to send (turn off to send as soon as you stop talking)</label>
+      <label class="row"><input type="checkbox" data-setting="voiceReview"> Check before sending: what you say appears in the text box so you can edit it; press Enter to send (turn off to send as soon as you stop talking). Ending with "Jo" or an end word always sends at once.</label>
       <label class="row"><input type="checkbox" data-setting="conversation"> Conversation mode: keep listening for a follow-up after each spoken answer (press Esc to stop)</label>
       <p class="hint" id="voice-hint"></p>
       <details class="direct"><summary>Gemini voice model (advanced)</summary>
@@ -2709,7 +2710,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     userName: "", callMe: "KK", geminiKey: "", geminiModel: DEFAULT_MODEL, bridgeUrl: "https://yvxtdzilqawpqnfvvlob.supabase.co/functions/v1/office-bridge", bridgeKey: "",
     tamil: false, speak: true,
     voiceEngine: "gemini", fastVoice: true, geminiVoiceEn: "Charon", geminiVoiceTa: "Kore", pcVoiceEn: "", pcVoiceTa: "", ttsModel: "",
-    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 2, endMode: "word", endWords: "over, that's it, that's all, send it, go ahead, full stop, அவ்வளவுதான்", conversation: true, voiceReview: true, writerEngine: "gemini", openaiKey: "", openaiModel: "", claudeKey: "", geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
+    theme: "navy", markRead: true, wakeWord: true, pauseSeconds: 2, endMode: "word", joEnds: true, endWords: "over, that's it, that's all, send it, go ahead, full stop, அவ்வளவுதான்", conversation: true, voiceReview: true, writerEngine: "gemini", openaiKey: "", openaiModel: "", claudeKey: "", geminiEars: true, vocabulary: "", briefEnabled: true, briefTime: "08:00", mailCheckMinutes: 3, announceMail: true,
   };
   let settings = { ...DEFAULTS, ...readJson("office.settings", {}) };
   const saveSettings = () => storage.setItem("office.settings", JSON.stringify(settings));
@@ -3242,6 +3243,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
   const escRe = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const endWordsRe = () => {
     const ws = String(settings.endWords || "").split(",").map((w) => w.trim()).filter(Boolean).map(escRe);
+    if (settings.joEnds !== false) ws.push("jo", "joe", "jho", "joh", "ஜோ"); // "Jo … Jo": the second Jo ends your turn
     return ws.length ? new RegExp(`(?:^|[\\s,.!?])(?:${ws.join("|")})[\\s,.!?]*$`, "i") : null;
   };
   const HOLD_ON = /\b(hold on|wait a (minute|moment|second)|one (minute|moment|second)|let me think)[\s,.!?]*$|(இருங்க|ஒரு நிமிஷம்)[\s,.!?]*$/i;
@@ -3264,7 +3266,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     if (rec) return;
     const recording = startRecording(); // in parallel, so the recogniser isn't held up
     const mode = ["word", "pause", "tap"].includes(settings.endMode) ? settings.endMode : "word";
-    const firstEnd = (String(settings.endWords || "").split(",")[0] || "").trim();
+    const firstEnd = settings.joEnds !== false ? "Jo" : (String(settings.endWords || "").split(",")[0] || "").trim();
     const how = mode === "word" && firstEnd ? `LISTENING… SAY "${firstEnd.toUpperCase()}" OR TAP TO SEND` : "LISTENING… TAP TO SEND";
     let hold = false, endedBy = "", endTimer = null; // hold: "hold on" was said, so pauses don't end the turn
     // How long a silence (in your voice and the browser's words) ends the turn.
@@ -3300,6 +3302,7 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       if (finished) return;
       finished = true;
       endedBy = why;
+      if (why === "word" || why === "tap") chimeDone();
       clearTimeout(silence); clearTimeout(endTimer);
       try { rec?.stop(); } catch { /* already stopped */ }
     }
@@ -3330,7 +3333,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
       if (!fixed) { input.value = draft; setState("idle"); return; }
       lastHeard = heard && stripEndWord(heard) !== fixed ? stripEndWord(heard) : ""; // the browser's version, as a second opinion for Jo
       // A long silence without an end word: you may not have finished, so the words wait in the box.
-      const check = review() || endedBy === "silence";
+      // Saying "Jo" (or another end word) means "go": it's sent at once. Changes still wait for your yes.
+      const check = (review() && endedBy !== "word") || endedBy === "silence";
       if (!check) { input.value = ""; ask(fixed, { voice: true }); return; }
       // Like typing: the words wait in the box to be checked or edited, and Enter sends them.
       input.value = `${draft} ${fixed}`.trim();
@@ -3390,6 +3394,8 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     waitFor(prefix ? pauseMs() : followUp ? FOLLOW_UP_MS : FIRST_WORD_MS);
     input.value = text();
     start();
+    // "Jo, show my tasks, Jo" in one breath: the wake ear already heard the closing "Jo".
+    if (prefix && mode !== "tap" && endWordsRe()?.test(prefix)) endTimer = setTimeout(() => { if (endWordsRe().test(text())) finish("word"); }, 700);
   }
 
   // ---------- wake word: say "Jo" ----------
@@ -3454,6 +3460,14 @@ details.direct { margin-top: 8px; font-size: 13px; color: var(--sub); }
     o.type = "sine"; o.frequency.setValueAtTime(880, t); o.frequency.exponentialRampToValueAtTime(1320, t + 0.12);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
     o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.26);
+  }
+  /** A falling chime: Jo has stopped listening. */
+  function chimeDone() {
+    const ac = ensureAudio(); if (!ac) return;
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+    o.type = "sine"; o.frequency.setValueAtTime(1320, t); o.frequency.exponentialRampToValueAtTime(660, t + 0.15);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.3);
   }
   function renderWake() {
     $("wake").classList.toggle("on", wakeOn());
